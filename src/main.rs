@@ -28,7 +28,7 @@ impl std::ops::Add<(i32, i32)> for Pos {
 struct Board {
     tiles: Vec<char>,
     width: usize,
-    height: usize,
+    _height: usize,
     player_pos: Pos,
     hunter_pos: Pos,
 }
@@ -53,7 +53,7 @@ impl Board {
         Self {
             tiles,
             width,
-            height: 8,
+            _height: 8,
             player_pos,
             hunter_pos,
         }
@@ -143,6 +143,55 @@ fn move_player(board: &mut Board, offset: (i32, i32)) -> MoveOutcome {
     MoveOutcome::NotMoved
 }
 
+fn move_hunter_internal(board: &mut Board, offset: (i32, i32)) -> MoveOutcome {
+    if offset == (0, 0) {
+        return MoveOutcome::NotMoved;
+    }
+    let dest = board.hunter_pos + offset;
+    let at_dest = board.at(dest);
+    let Some(at_dest) = at_dest else {
+        return MoveOutcome::NotMoved;
+    };
+    if at_dest != &'#' {
+        board.set_at(board.hunter_pos, ' ');
+        board.set_at(dest, '=');
+        board.hunter_pos = dest;
+        return MoveOutcome::Moved;
+    }
+    MoveOutcome::NotMoved
+}
+
+fn move_hunter(board: &mut Board) -> MoveOutcome {
+    let dist_x = (board.player_pos.x - board.hunter_pos.x).abs();
+    let dist_y = (board.player_pos.y - board.hunter_pos.y).abs();
+
+    let horizontal_chase = match board.player_pos.x.cmp(&board.hunter_pos.x) {
+        std::cmp::Ordering::Less => (-1, 0),
+        std::cmp::Ordering::Equal => (0, 0),
+        std::cmp::Ordering::Greater => (1, 0),
+    };
+
+    let vertical_chase = match board.player_pos.y.cmp(&board.hunter_pos.y) {
+        std::cmp::Ordering::Less => (0, -1),
+        std::cmp::Ordering::Equal => (0, 0),
+        std::cmp::Ordering::Greater => (0, 1),
+    };
+
+    if dist_x > dist_y {
+        let outcome = move_hunter_internal(board, horizontal_chase);
+        match outcome {
+            MoveOutcome::Moved => MoveOutcome::Moved,
+            MoveOutcome::NotMoved => move_hunter_internal(board, vertical_chase),
+        }
+    } else {
+        let outcome = move_hunter_internal(board, vertical_chase);
+        match outcome {
+            MoveOutcome::Moved => MoveOutcome::Moved,
+            MoveOutcome::NotMoved => move_hunter_internal(board, horizontal_chase),
+        }
+    }
+}
+
 fn is_dead(board: &Board) -> bool {
     board.player_pos == board.hunter_pos
 }
@@ -150,9 +199,8 @@ fn is_dead(board: &Board) -> bool {
 fn main() {
     let mut board = Board::new_test_01();
 
-    loop {
-        println!("{board}");
-
+    println!("{board}");
+    'outer: loop {
         let key = get_key();
         if key == KeyCode::Esc {
             break;
@@ -172,8 +220,20 @@ fn main() {
                 if is_dead(&board) {
                     break;
                 }
+
+                for _ in 0..2 {
+                    let outcome = move_hunter(&mut board);
+                    if let MoveOutcome::Moved = outcome {
+                        if is_dead(&board) {
+                            break 'outer;
+                        }
+                    }
+                }
             }
         }
+        println!("{board}");
     }
+
     println!("game over");
+    println!("{board}");
 }
