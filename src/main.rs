@@ -2,6 +2,9 @@ use colored::Colorize;
 use crossterm::event::{poll, read, Event, KeyCode, KeyEventKind};
 use std::{fmt::Display, time::Duration};
 
+const DEAD_MESSAGE: &str = "The berserker king hits you. You die...";
+const WIN_MESSAGE: &str = "CoNgRaTs!";
+
 #[derive(Copy, Clone, PartialEq)]
 struct Pos {
     x: i32,
@@ -31,6 +34,7 @@ struct Board {
     _height: usize,
     player_pos: Pos,
     hunter_pos: Pos,
+    exit_pos: Pos,
 }
 
 impl Board {
@@ -43,12 +47,13 @@ impl Board {
                 '#', ' ', ' ', ' ', '#', ' ', ' ', ' ', ' ', ' ', ' ', '#',
                 '#', ' ', ' ', ' ', '#', '#', ' ', ' ', ' ', ' ', ' ', '#',
                 '#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '#',
-                '#', ' ', ' ', ' ', ' ', ' ', ' ', '$', ' ', ' ', ' ', '#',
+                '#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '$', ' ', ' ', '#',
                 '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#',
             ];
         let width = 12;
         let player_pos = find_char(&tiles, '@', width);
         let hunter_pos = find_char(&tiles, '=', width);
+        let exit_pos = find_char(&tiles, '$', width);
 
         Self {
             tiles,
@@ -56,6 +61,7 @@ impl Board {
             _height: 8,
             player_pos,
             hunter_pos,
+            exit_pos,
         }
     }
 
@@ -99,6 +105,7 @@ impl Display for Board {
                         '#' => "#".blue(),
                         '@' => "@".bright_green(),
                         '=' => "K".red(),
+                        '$' => "$".bright_white(),
                         _ => " ".black(),
                     }
                 )?;
@@ -196,6 +203,10 @@ fn is_dead(board: &Board) -> bool {
     board.player_pos == board.hunter_pos
 }
 
+fn is_win(board: &Board) -> bool {
+    board.player_pos == board.exit_pos
+}
+
 fn main() {
     let mut board = Board::new_test_01();
 
@@ -218,6 +229,11 @@ fn main() {
             let outcome = move_player(&mut board, offset);
             if let MoveOutcome::Moved = outcome {
                 if is_dead(&board) {
+                    println!("{}", DEAD_MESSAGE.red());
+                    break;
+                }
+                if is_win(&board) {
+                    println!("{}", WIN_MESSAGE.green());
                     break;
                 }
 
@@ -225,6 +241,7 @@ fn main() {
                     let outcome = move_hunter(&mut board);
                     if let MoveOutcome::Moved = outcome {
                         if is_dead(&board) {
+                            println!("{}", DEAD_MESSAGE.red());
                             break 'outer;
                         }
                     }
