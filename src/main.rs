@@ -2,7 +2,7 @@ use colored::Colorize;
 use crossterm::event::{poll, read, Event, KeyCode, KeyEventKind};
 use std::{fmt::Display, time::Duration};
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq)]
 struct Pos {
     x: i32,
     y: i32,
@@ -134,14 +134,17 @@ fn move_player(board: &mut Board, offset: (i32, i32)) -> MoveOutcome {
     let Some(at_dest) = at_dest else {
         return MoveOutcome::NotMoved;
     };
-    if at_dest != &' ' {
-        return MoveOutcome::NotMoved;
+    if at_dest != &'#' {
+        board.set_at(board.player_pos, ' ');
+        board.set_at(dest, '@');
+        board.player_pos = dest;
+        return MoveOutcome::Moved;
     }
+    MoveOutcome::NotMoved
+}
 
-    board.set_at(board.player_pos, ' ');
-    board.set_at(dest, '@');
-    board.player_pos = dest;
-    MoveOutcome::Moved
+fn is_dead(board: &Board) -> bool {
+    board.player_pos == board.hunter_pos
 }
 
 fn main() {
@@ -165,6 +168,11 @@ fn main() {
 
         if let Some(offset) = maybe_offset {
             let outcome = move_player(&mut board, offset);
+            if let MoveOutcome::Moved = outcome {
+                if is_dead(&board) {
+                    break;
+                }
+            }
         }
     }
     println!("game over");
