@@ -1,5 +1,6 @@
 use colored::Colorize;
-use std::fmt::Display;
+use crossterm::event::{poll, read, Event, KeyCode, KeyEventKind};
+use std::{fmt::Display, time::Duration};
 
 struct Board {
     tiles: Vec<char>,
@@ -36,7 +37,7 @@ impl Board {
     }
 }
 
-fn find_char(tiles: &Vec<char>, cc: char, width: usize) -> (usize, usize) {
+fn find_char(tiles: &[char], cc: char, width: usize) -> (usize, usize) {
     tiles
         .iter()
         .enumerate()
@@ -51,9 +52,11 @@ fn find_char(tiles: &Vec<char>, cc: char, width: usize) -> (usize, usize) {
 
 impl Display for Board {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Ok(self.tiles.chunks(self.width).for_each(|chunk| {
-            chunk.into_iter().for_each(|c| {
-                print!(
+        let chunks = self.tiles.chunks(self.width);
+        for chunk in chunks {
+            for c in chunk {
+                write!(
+                    f,
                     "{}",
                     match c {
                         '#' => "#".blue(),
@@ -61,14 +64,38 @@ impl Display for Board {
                         '=' => "K".red(),
                         _ => " ".black(),
                     }
-                )
-            });
-            println!();
-        }))
+                )?;
+            }
+            writeln!(f)?;
+        }
+        Ok(())
+    }
+}
+
+fn get_key() -> KeyCode {
+    loop {
+        if poll(Duration::from_millis(1_000)).unwrap() {
+            let event = read().unwrap();
+            match event {
+                Event::Key(ev) if ev.kind == KeyEventKind::Press => {
+                    return ev.code;
+                }
+                _ => (),
+            }
+        }
     }
 }
 
 fn main() {
     let b = Board::new_test_01();
-    println!("{b}");
+
+    loop {
+        println!("{b}");
+
+        let key = get_key();
+        if key == KeyCode::Esc {
+            break;
+        }
+    }
+    println!("game over");
 }
