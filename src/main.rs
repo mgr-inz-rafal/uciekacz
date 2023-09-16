@@ -177,7 +177,7 @@ fn move_hunter(board: &mut Board) -> MoveOutcome {
         std::cmp::Ordering::Greater => (0, 1),
     };
 
-    if dist_x > dist_y {
+    if dist_x < dist_y {
         let outcome = move_hunter_internal(board, horizontal_chase);
         match outcome {
             MoveOutcome::Moved => MoveOutcome::Moved,
