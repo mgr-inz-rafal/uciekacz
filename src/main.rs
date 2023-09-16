@@ -2,12 +2,35 @@ use colored::Colorize;
 use crossterm::event::{poll, read, Event, KeyCode, KeyEventKind};
 use std::{fmt::Display, time::Duration};
 
+#[derive(Copy, Clone)]
+struct Pos {
+    x: i32,
+    y: i32,
+}
+
+impl Pos {
+    fn new(x: i32, y: i32) -> Self {
+        Self { x, y }
+    }
+}
+
+impl std::ops::Add<(i32, i32)> for Pos {
+    type Output = Pos;
+
+    fn add(self, rhs: (i32, i32)) -> Self::Output {
+        Self {
+            x: self.x + rhs.0,
+            y: self.y + rhs.1,
+        }
+    }
+}
+
 struct Board {
     tiles: Vec<char>,
     width: usize,
     height: usize,
-    player_pos: (usize, usize),
-    hunter_pos: (usize, usize),
+    player_pos: Pos,
+    hunter_pos: Pos,
 }
 
 impl Board {
@@ -35,9 +58,23 @@ impl Board {
             hunter_pos,
         }
     }
+
+    fn at(&self, pos: Pos) -> Option<&char> {
+        let i = self.pos2index(pos);
+        self.tiles.get(i)
+    }
+
+    fn set_at(&mut self, pos: Pos, c: char) {
+        let i = self.pos2index(pos);
+        self.tiles[i] = c;
+    }
+
+    fn pos2index(&self, pos: Pos) -> usize {
+        (pos.y * self.width as i32 + pos.x) as usize
+    }
 }
 
-fn find_char(tiles: &[char], cc: char, width: usize) -> (usize, usize) {
+fn find_char(tiles: &[char], cc: char, width: usize) -> Pos {
     tiles
         .iter()
         .enumerate()
@@ -45,7 +82,7 @@ fn find_char(tiles: &[char], cc: char, width: usize) -> (usize, usize) {
         .map(|(i, _)| {
             let y = i / width;
             let x = i - y * width;
-            (x, y)
+            Pos::new(x as i32, y as i32)
         })
         .expect("no {c}")
 }
@@ -74,7 +111,7 @@ impl Display for Board {
 
 fn get_key() -> KeyCode {
     loop {
-        if poll(Duration::from_millis(1_000)).unwrap() {
+        if poll(Duration::from_millis(100)).unwrap() {
             let event = read().unwrap();
             match event {
                 Event::Key(ev) if ev.kind == KeyEventKind::Press => {
@@ -86,15 +123,48 @@ fn get_key() -> KeyCode {
     }
 }
 
+enum MoveOutcome {
+    Moved,
+    NotMoved,
+}
+
+fn move_player(board: &mut Board, offset: (i32, i32)) -> MoveOutcome {
+    let dest = board.player_pos + offset;
+    let at_dest = board.at(dest);
+    let Some(at_dest) = at_dest else {
+        return MoveOutcome::NotMoved;
+    };
+    if at_dest != &' ' {
+        return MoveOutcome::NotMoved;
+    }
+
+    board.set_at(board.player_pos, ' ');
+    board.set_at(dest, '@');
+    board.player_pos = dest;
+    MoveOutcome::Moved
+}
+
 fn main() {
-    let b = Board::new_test_01();
+    let mut board = Board::new_test_01();
 
     loop {
-        println!("{b}");
+        println!("{board}");
 
         let key = get_key();
         if key == KeyCode::Esc {
             break;
+        }
+
+        let maybe_offset = match key {
+            KeyCode::Left => Some((-1, 0)),
+            KeyCode::Right => Some((1, 0)),
+            KeyCode::Up => Some((0, -1)),
+            KeyCode::Down => Some((0, 1)),
+            _ => None,
+        };
+
+        if let Some(offset) = maybe_offset {
+            let outcome = move_player(&mut board, offset);
         }
     }
     println!("game over");
