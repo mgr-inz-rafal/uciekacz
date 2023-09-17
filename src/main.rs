@@ -1,6 +1,7 @@
 use colored::Colorize;
 use crossterm::event::{poll, read, Event, KeyCode, KeyEventKind};
-use std::{fmt::Display, time::Duration};
+use petgraph::{data::Build, Graph};
+use std::{collections::BTreeSet, fmt::Display, ops::ControlFlow, time::Duration};
 
 const DEAD_MESSAGE: &str = "The berserker king hits you. You die...";
 const WIN_MESSAGE: &str = "CoNgRaTs!";
@@ -28,6 +29,7 @@ impl std::ops::Add<(i32, i32)> for Pos {
     }
 }
 
+#[derive(Clone)]
 struct Board {
     tiles: Vec<char>,
     width: usize,
@@ -117,6 +119,8 @@ impl Display for Board {
 }
 
 fn get_key() -> KeyCode {
+    return KeyCode::BackTab;
+
     loop {
         if poll(Duration::from_millis(100)).unwrap() {
             let event = read().unwrap();
@@ -133,6 +137,12 @@ fn get_key() -> KeyCode {
 enum MoveOutcome {
     Moved,
     NotMoved,
+}
+
+enum TickOutcome {
+    Dead,
+    Alive(MoveOutcome),
+    Victory,
 }
 
 fn move_player(board: &mut Board, offset: (i32, i32)) -> MoveOutcome {
@@ -207,10 +217,81 @@ fn is_win(board: &Board) -> bool {
     board.player_pos == board.exit_pos
 }
 
+fn recurse(g: &mut Graph<Board, i32>, board: &mut Board, depth: &mut i32) {
+    *depth += 1;
+    if *depth >= 100 {
+        println!("Depth too deep, reverting");
+        *depth -= 1;
+        return;
+    }
+
+    println!("Current ({depth}) node:");
+    println!("{board}");
+
+    let current_node_index = g.add_node(board.clone());
+    let mut current_baord = board.clone();
+    let offsets = [(-1, 0), (1, 0), (0, -1), (0, 1)];
+    for offset in offsets {
+        println!("Trying with offset={},{}", offset.0, offset.1);
+        match tick(&mut current_baord, offset) {
+            TickOutcome::Dead => {
+                println!("Not good, continuing with other moves");
+                get_key();
+            }
+            TickOutcome::Alive(MoveOutcome::Moved) => {
+                println!("Descending ({depth}) into new node");
+                //println!("{board}");
+                get_key();
+                let new_node_index = g.add_node(current_baord.clone());
+                g.add_edge(current_node_index, new_node_index, 1);
+                recurse(g, &mut current_baord, depth);
+            }
+            TickOutcome::Victory => {
+                println!("Victory, but continuing with other moves");
+                get_key();
+            }
+            TickOutcome::Alive(MoveOutcome::NotMoved) => {
+                println!("No can do this way, continuing with other moves");
+                get_key();
+            }
+        }
+    }
+}
+
 fn main() {
     let mut board = Board::new_test_01();
 
+    let mut g = Graph::new();
+
     println!("{board}");
+
+    let mut depth = 0;
+    recurse(&mut g, &mut board, &mut depth);
+
+    // loop {
+    //     println!("Press key");
+    //     let _ = get_key();
+
+    //     let current_node = (board.player_pos, board.hunter_pos);
+    //     let current_node_index = g.add_node(current_node);
+
+    //     let offsets = [(-1, 0), (1, 0), (0, -1), (0, 1)];
+    //     for offset in offsets {
+    //         match tick(&mut board, offset) {
+    //             TickOutcome::Dead => break,
+    //             TickOutcome::Alive => {
+    //                 let new_node = (board.player_pos, board.hunter_pos);
+    //                 let new_node_index = g.add_node(new_node);
+    //                 g.add_edge(current_node_index, new_node_index, 1);
+    //             }
+    //             TickOutcome::Victory => break,
+    //         }
+    //         println!("{board}");
+    //     }
+    // }
+
+    // Manual
+    /*
     'outer: loop {
         let key = get_key();
         if key == KeyCode::Esc {
@@ -226,31 +307,44 @@ fn main() {
         };
 
         if let Some(offset) = maybe_offset {
-            let outcome = move_player(&mut board, offset);
-            if let MoveOutcome::Moved = outcome {
-                if is_dead(&board) {
-                    println!("{}", DEAD_MESSAGE.red());
-                    break;
-                }
-                if is_win(&board) {
-                    println!("{}", WIN_MESSAGE.green());
-                    break;
-                }
-
-                for _ in 0..2 {
-                    let outcome = move_hunter(&mut board);
-                    if let MoveOutcome::Moved = outcome {
-                        if is_dead(&board) {
-                            println!("{}", DEAD_MESSAGE.red());
-                            break 'outer;
-                        }
-                    }
-                }
+            match tick(&mut board, offset) {
+                TickOutcome::Dead => break 'outer,
+                TickOutcome::Alive => (),
+                TickOutcome::Victory => break 'outer,
             }
         }
         println!("{board}");
     }
+    */
 
     println!("game over");
     println!("{board}");
+
+    println!("{}", g.node_count());
+}
+
+fn tick(board: &mut Board, offset: (i32, i32)) -> TickOutcome {
+    let outcome = move_player(board, offset);
+    if let MoveOutcome::Moved = outcome {
+        if is_dead(&*board) {
+            println!("{}", DEAD_MESSAGE.red());
+            return TickOutcome::Dead;
+        }
+        if is_win(&*board) {
+            println!("{}", WIN_MESSAGE.green());
+            return TickOutcome::Victory;
+        }
+
+        for _ in 0..2 {
+            let outcome = move_hunter(board);
+            if let MoveOutcome::Moved = outcome {
+                if is_dead(&*board) {
+                    println!("{}", DEAD_MESSAGE.red());
+                    return TickOutcome::Dead;
+                }
+            }
+        }
+        return TickOutcome::Alive(MoveOutcome::Moved);
+    }
+    TickOutcome::Alive(MoveOutcome::NotMoved)
 }
