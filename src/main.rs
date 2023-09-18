@@ -1,6 +1,6 @@
 use colored::Colorize;
 use crossterm::event::{poll, read, Event, KeyCode, KeyEventKind};
-use petgraph::{data::Build, Graph};
+use petgraph::{algo::astar, data::Build, graph::Node, stable_graph::NodeIndex, Graph};
 use std::{collections::BTreeSet, fmt::Display, ops::ControlFlow, time::Duration};
 
 const DEAD_MESSAGE: &str = "The berserker king hits you. You die...";
@@ -29,7 +29,7 @@ impl std::ops::Add<(i32, i32)> for Pos {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 struct Board {
     tiles: Vec<char>,
     width: usize,
@@ -134,6 +134,20 @@ fn get_key() -> KeyCode {
     }
 }
 
+fn get_key_always() -> KeyCode {
+    loop {
+        if poll(Duration::from_millis(100)).unwrap() {
+            let event = read().unwrap();
+            match event {
+                Event::Key(ev) if ev.kind == KeyEventKind::Press => {
+                    return ev.code;
+                }
+                _ => (),
+            }
+        }
+    }
+}
+
 enum MoveOutcome {
     Moved,
     NotMoved,
@@ -217,37 +231,58 @@ fn is_win(board: &Board) -> bool {
     board.player_pos == board.exit_pos
 }
 
-fn recurse(g: &mut Graph<Board, i32>, board: &mut Board, depth: &mut i32) {
-    *depth += 1;
-    if *depth >= 100 {
-        println!("Depth too deep, reverting");
-        *depth -= 1;
-        return;
-    }
-
+fn recurse(g: &mut Graph<Board, i32>, board: Board, depth: i32, winners: &mut Vec<NodeIndex>) {
     println!("Current ({depth}) node:");
     println!("{board}");
 
+    if depth >= 1000 {
+        println!("Depth too deep, reverting");
+        return;
+    }
+
     let current_node_index = g.add_node(board.clone());
-    let mut current_baord = board.clone();
+
+    println!("Added node displayed above");
+
     let offsets = [(-1, 0), (1, 0), (0, -1), (0, 1)];
     for offset in offsets {
+        let mut board_for_tick = board.clone();
         println!("Trying with offset={},{}", offset.0, offset.1);
-        match tick(&mut current_baord, offset) {
+        match tick(&mut board_for_tick, offset) {
             TickOutcome::Dead => {
                 println!("Not good, continuing with other moves");
                 get_key();
             }
             TickOutcome::Alive(MoveOutcome::Moved) => {
                 println!("Descending ({depth}) into new node");
+                get_key();
+
+                // TODO: Inefficient.
+                let mut already_exists = false;
+                let h = g.clone();
+                let (nodes, _) = h.into_nodes_edges();
+                for node in nodes {
+                    let inner_board = node.weight;
+                    if inner_board == board_for_tick {
+                        already_exists = true;
+                    }
+                }
+                if already_exists {
+                    println!("But I already have this node, so no descending...");
+                    continue;
+                }
+
                 //println!("{board}");
                 get_key();
-                let new_node_index = g.add_node(current_baord.clone());
+                let new_node_index = g.add_node(board_for_tick.clone());
                 g.add_edge(current_node_index, new_node_index, 1);
-                recurse(g, &mut current_baord, depth);
+                recurse(g, board_for_tick, depth + 1, winners);
             }
             TickOutcome::Victory => {
                 println!("Victory, but continuing with other moves");
+                let new_node_index = g.add_node(board_for_tick.clone());
+                g.add_edge(current_node_index, new_node_index, 1);
+                winners.push(new_node_index);
                 get_key();
             }
             TickOutcome::Alive(MoveOutcome::NotMoved) => {
@@ -263,10 +298,25 @@ fn main() {
 
     let mut g = Graph::new();
 
-    println!("{board}");
+    //    println!("{board}");
 
-    let mut depth = 0;
-    recurse(&mut g, &mut board, &mut depth);
+    let mut winners = Vec::new();
+
+    let depth = 0;
+    recurse(&mut g, board, depth, &mut winners);
+
+    println!("Got {} winners", winners.len());
+    if winners.len() == 1 {
+        let winner = winners.pop().unwrap();
+        let start = g.node_indices().next().unwrap();
+
+        println!("{start:?} -> {winner:?}");
+
+        let path = astar(&g, start, |finish| finish == winner, |_| 1, |_| 0);
+        dbg!(&path);
+    } else {
+        println!("No clear winner or no winner at all");
+    }
 
     // loop {
     //     println!("Press key");
@@ -318,9 +368,9 @@ fn main() {
     */
 
     println!("game over");
-    println!("{board}");
+    //    println!("{board}");
 
-    println!("{}", g.node_count());
+    //println!("{}", g.node_count());
 }
 
 fn tick(board: &mut Board, offset: (i32, i32)) -> TickOutcome {
