@@ -57,6 +57,22 @@ impl Board {
         let hunter_pos = find_char(&tiles, '=', width);
         let exit_pos = find_char(&tiles, '$', width);
 
+        // #[rustfmt::skip]
+        // let tiles = vec![
+        //         '#', '#', '#', '#',
+        //         '#', ' ', '@', '#',
+        //         '#', ' ', ' ', '#',
+        //         '#', ' ', '$', '#',
+        //         '#', ' ', ' ', '#',
+        //         '#', ' ', ' ', '#',
+        //         '#', '=', ' ', '#',
+        //         '#', '#', '#', '#'
+        //     ];
+        // let width = 4;
+        // let player_pos = find_char(&tiles, '@', width);
+        // let hunter_pos = find_char(&tiles, '=', width);
+        // let exit_pos = find_char(&tiles, '$', width);
+
         Self {
             tiles,
             width,
@@ -231,32 +247,34 @@ fn is_win(board: &Board) -> bool {
     board.player_pos == board.exit_pos
 }
 
-fn recurse(g: &mut Graph<Board, i32>, board: Board, depth: i32, winners: &mut Vec<NodeIndex>) {
-    println!("Current ({depth}) node:");
-    println!("{board}");
-
+fn recurse(
+    g: &mut Graph<Board, i32>,
+    board: Board,
+    depth: i32,
+    winners: &mut Vec<NodeIndex>,
+    source_node_index: Option<NodeIndex>,
+) {
     if depth >= 1000 {
         println!("Depth too deep, reverting");
         return;
     }
 
     let current_node_index = g.add_node(board.clone());
-
-    println!("Added node displayed above");
+    if let Some(source_node_index) = source_node_index {
+        g.add_edge(source_node_index, current_node_index, 1);
+        println!("Alive(Moved): adding edge {source_node_index:?} -> {current_node_index:?}");
+    }
 
     let offsets = [(-1, 0), (1, 0), (0, -1), (0, 1)];
     for offset in offsets {
-        let mut board_for_tick = board.clone();
-        println!("Trying with offset={},{}", offset.0, offset.1);
-        match tick(&mut board_for_tick, offset) {
-            TickOutcome::Dead => {
-                println!("Not good, continuing with other moves");
-                get_key();
-            }
-            TickOutcome::Alive(MoveOutcome::Moved) => {
-                println!("Descending ({depth}) into new node");
-                get_key();
+        println!("At node {current_node_index:?} with depth {depth}");
+        println!("{board}");
+        get_key();
 
+        let mut board_for_tick = board.clone();
+        match tick(&mut board_for_tick, offset) {
+            TickOutcome::Dead => {}
+            TickOutcome::Alive(MoveOutcome::Moved) => {
                 // TODO: Inefficient.
                 let mut already_exists = false;
                 let h = g.clone();
@@ -268,27 +286,30 @@ fn recurse(g: &mut Graph<Board, i32>, board: Board, depth: i32, winners: &mut Ve
                     }
                 }
                 if already_exists {
-                    println!("But I already have this node, so no descending...");
                     continue;
                 }
 
-                //println!("{board}");
+                println!("Descending into:");
+                println!("{board_for_tick}");
                 get_key();
-                let new_node_index = g.add_node(board_for_tick.clone());
-                g.add_edge(current_node_index, new_node_index, 1);
-                recurse(g, board_for_tick, depth + 1, winners);
+                recurse(
+                    g,
+                    board_for_tick,
+                    depth + 1,
+                    winners,
+                    Some(current_node_index),
+                );
             }
             TickOutcome::Victory => {
-                println!("Victory, but continuing with other moves");
+                println!("Descending into:");
+                println!("{board_for_tick}");
+                get_key();
                 let new_node_index = g.add_node(board_for_tick.clone());
+                println!("Winner: adding edge {source_node_index:?} -> {current_node_index:?}");
                 g.add_edge(current_node_index, new_node_index, 1);
                 winners.push(new_node_index);
-                get_key();
             }
-            TickOutcome::Alive(MoveOutcome::NotMoved) => {
-                println!("No can do this way, continuing with other moves");
-                get_key();
-            }
+            TickOutcome::Alive(MoveOutcome::NotMoved) => {}
         }
     }
 }
@@ -303,7 +324,7 @@ fn main() {
     let mut winners = Vec::new();
 
     let depth = 0;
-    recurse(&mut g, board, depth, &mut winners);
+    recurse(&mut g, board, depth, &mut winners, None);
 
     println!("Got {} winners", winners.len());
     if winners.len() == 1 {
@@ -314,6 +335,18 @@ fn main() {
 
         let path = astar(&g, start, |finish| finish == winner, |_| 1, |_| 0);
         dbg!(&path);
+
+        if let Some((len, nodes)) = path {
+            println!("replaying path of len {}:", len);
+            nodes.iter().enumerate().for_each(|(index, node)| {
+                println!("Step {index}:");
+                println!("{}", g.raw_nodes()[node.index()].weight);
+                println!();
+                get_key_always();
+            })
+        } else {
+            println!("No path?");
+        }
     } else {
         println!("No clear winner or no winner at all");
     }
