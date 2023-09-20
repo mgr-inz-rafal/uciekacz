@@ -279,9 +279,10 @@ fn recurse(
                 let mut already_exists = false;
                 let h = g.clone();
                 let (nodes, _) = h.into_nodes_edges();
-                for node in nodes {
-                    let inner_board = node.weight;
+                for (index, node) in nodes.iter().enumerate() {
+                    let inner_board = node.weight.clone();
                     if inner_board == board_for_tick {
+                        g.add_edge(current_node_index, NodeIndex::new(index), 1);
                         already_exists = true;
                     }
                 }
@@ -303,7 +304,7 @@ fn recurse(
             TickOutcome::Victory => {
                 println!("Descending into:");
                 println!("{board_for_tick}");
-                get_key();
+                get_key_always();
                 let new_node_index = g.add_node(board_for_tick.clone());
                 println!("Winner: adding edge {source_node_index:?} -> {current_node_index:?}");
                 g.add_edge(current_node_index, new_node_index, 1);
@@ -317,10 +318,9 @@ fn recurse(
 fn main() {
     let mut board = Board::new_test_01();
 
+    println!("{board}");
+
     let mut g = Graph::new();
-
-    //    println!("{board}");
-
     let mut winners = Vec::new();
 
     let depth = 0;
@@ -374,34 +374,32 @@ fn main() {
     // }
 
     // Manual
-    /*
-    'outer: loop {
-        let key = get_key();
-        if key == KeyCode::Esc {
-            break;
-        }
+    // 'outer: loop {
+    //     let key = get_key();
+    //     if key == KeyCode::Esc {
+    //         break;
+    //     }
 
-        let maybe_offset = match key {
-            KeyCode::Left => Some((-1, 0)),
-            KeyCode::Right => Some((1, 0)),
-            KeyCode::Up => Some((0, -1)),
-            KeyCode::Down => Some((0, 1)),
-            _ => None,
-        };
+    //     let maybe_offset = match key {
+    //         KeyCode::Left => Some((-1, 0)),
+    //         KeyCode::Right => Some((1, 0)),
+    //         KeyCode::Up => Some((0, -1)),
+    //         KeyCode::Down => Some((0, 1)),
+    //         _ => None,
+    //     };
 
-        if let Some(offset) = maybe_offset {
-            match tick(&mut board, offset) {
-                TickOutcome::Dead => break 'outer,
-                TickOutcome::Alive => (),
-                TickOutcome::Victory => break 'outer,
-            }
-        }
-        println!("{board}");
-    }
-    */
+    //     if let Some(offset) = maybe_offset {
+    //         match tick(&mut board, offset) {
+    //             TickOutcome::Dead => break 'outer,
+    //             TickOutcome::Alive(_) => (),
+    //             TickOutcome::Victory => break 'outer,
+    //         }
+    //     }
+    //     println!("{board}");
+    // }
 
     println!("game over");
-    //    println!("{board}");
+    //println!("{board}");
 
     //println!("{}", g.node_count());
 }
