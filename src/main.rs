@@ -1,7 +1,11 @@
 use colored::Colorize;
-use crossterm::event::{poll, read, Event, KeyCode, KeyEventKind};
+use crossterm::{
+    event::{poll, read, Event, KeyCode, KeyEventKind},
+    execute,
+    terminal::{self, ClearType},
+};
 use petgraph::{algo::astar, data::Build, graph::Node, stable_graph::NodeIndex, Graph};
-use std::{collections::BTreeSet, fmt::Display, ops::ControlFlow, time::Duration};
+use std::{collections::BTreeSet, fmt::Display, io, ops::ControlFlow, time::Duration};
 
 const DEAD_MESSAGE: &str = "The berserker king hits you. You die...";
 const WIN_MESSAGE: &str = "CoNgRaTs!";
@@ -339,6 +343,7 @@ fn main() {
         if let Some((len, nodes)) = path {
             println!("replaying path of len {}:", len);
             nodes.iter().enumerate().for_each(|(index, node)| {
+                let _ = execute!(io::stdout(), terminal::Clear(ClearType::All));
                 println!("Step {index}:");
                 println!("{}", g.raw_nodes()[node.index()].weight);
                 println!();
