@@ -1,3 +1,4 @@
+use clap::Parser;
 use colored::Colorize;
 use crossterm::{
     event::{poll, read, Event, KeyCode, KeyEventKind},
@@ -9,6 +10,13 @@ use std::{collections::BTreeSet, fmt::Display, io, ops::ControlFlow, time::Durat
 
 const DEAD_MESSAGE: &str = "The berserker king hits you. You die...";
 const WIN_MESSAGE: &str = "CoNgRaTs!";
+
+#[derive(Parser, Debug)]
+struct Args {
+    /// If specified, the game will find the solution automatically.
+    #[arg(short, long)]
+    auto: bool,
+}
 
 #[derive(Copy, Clone, PartialEq)]
 struct Pos {
@@ -139,7 +147,7 @@ impl Display for Board {
 }
 
 fn get_key() -> KeyCode {
-    return KeyCode::BackTab;
+    // return KeyCode::BackTab;
 
     loop {
         if poll(Duration::from_millis(100)).unwrap() {
@@ -320,93 +328,77 @@ fn recurse(
 }
 
 fn main() {
-    let mut board = Board::new_test_01();
+    let args = Args::parse();
 
-    println!("{board}");
+    if args.auto {
+        let mut board = Board::new_test_01();
 
-    let mut g = Graph::new();
-    let mut winners = Vec::new();
+        println!("{board}");
 
-    let depth = 0;
-    recurse(&mut g, board, depth, &mut winners, None);
+        let mut g = Graph::new();
+        let mut winners = Vec::new();
 
-    println!("Got {} winners", winners.len());
-    if winners.len() == 1 {
-        let winner = winners.pop().unwrap();
-        let start = g.node_indices().next().unwrap();
+        let depth = 0;
+        recurse(&mut g, board, depth, &mut winners, None);
 
-        println!("{start:?} -> {winner:?}");
+        println!("Got {} winners", winners.len());
+        if winners.len() == 1 {
+            let winner = winners.pop().unwrap();
+            let start = g.node_indices().next().unwrap();
 
-        let path = astar(&g, start, |finish| finish == winner, |_| 1, |_| 0);
-        dbg!(&path);
+            println!("{start:?} -> {winner:?}");
 
-        if let Some((len, nodes)) = path {
-            println!("replaying path of len {}:", len);
-            nodes.iter().enumerate().for_each(|(index, node)| {
-                let _ = execute!(io::stdout(), terminal::Clear(ClearType::All));
-                println!("Step {index}:");
-                println!("{}", g.raw_nodes()[node.index()].weight);
-                println!();
-                get_key_always();
-            })
+            let path = astar(&g, start, |finish| finish == winner, |_| 1, |_| 0);
+            dbg!(&path);
+
+            if let Some((len, nodes)) = path {
+                println!("replaying path of len {}:", len);
+                nodes.iter().enumerate().for_each(|(index, node)| {
+                    let _ = execute!(io::stdout(), terminal::Clear(ClearType::All));
+                    println!("Step {index}:");
+                    println!("{}", g.raw_nodes()[node.index()].weight);
+                    println!();
+                    get_key_always();
+                })
+            } else {
+                println!("No path?");
+            }
         } else {
-            println!("No path?");
+            println!("No clear winner or no winner at all");
         }
     } else {
-        println!("No clear winner or no winner at all");
+        loop {
+            let mut board = Board::new_test_01();
+
+            // Manual
+            'outer: loop {
+                let key = get_key();
+                if key == KeyCode::Esc {
+                    break;
+                }
+
+                let maybe_offset = match key {
+                    KeyCode::Left => Some((-1, 0)),
+                    KeyCode::Right => Some((1, 0)),
+                    KeyCode::Up => Some((0, -1)),
+                    KeyCode::Down => Some((0, 1)),
+                    _ => None,
+                };
+
+                if let Some(offset) = maybe_offset {
+                    match tick(&mut board, offset) {
+                        TickOutcome::Dead => break 'outer,
+                        TickOutcome::Alive(_) => (),
+                        TickOutcome::Victory => break 'outer,
+                    }
+                }
+                println!("{board}");
+            }
+
+            println!("game over");
+            println!("{board}");
+        }
     }
-
-    // loop {
-    //     println!("Press key");
-    //     let _ = get_key();
-
-    //     let current_node = (board.player_pos, board.hunter_pos);
-    //     let current_node_index = g.add_node(current_node);
-
-    //     let offsets = [(-1, 0), (1, 0), (0, -1), (0, 1)];
-    //     for offset in offsets {
-    //         match tick(&mut board, offset) {
-    //             TickOutcome::Dead => break,
-    //             TickOutcome::Alive => {
-    //                 let new_node = (board.player_pos, board.hunter_pos);
-    //                 let new_node_index = g.add_node(new_node);
-    //                 g.add_edge(current_node_index, new_node_index, 1);
-    //             }
-    //             TickOutcome::Victory => break,
-    //         }
-    //         println!("{board}");
-    //     }
-    // }
-
-    // Manual
-    // 'outer: loop {
-    //     let key = get_key();
-    //     if key == KeyCode::Esc {
-    //         break;
-    //     }
-
-    //     let maybe_offset = match key {
-    //         KeyCode::Left => Some((-1, 0)),
-    //         KeyCode::Right => Some((1, 0)),
-    //         KeyCode::Up => Some((0, -1)),
-    //         KeyCode::Down => Some((0, 1)),
-    //         _ => None,
-    //     };
-
-    //     if let Some(offset) = maybe_offset {
-    //         match tick(&mut board, offset) {
-    //             TickOutcome::Dead => break 'outer,
-    //             TickOutcome::Alive(_) => (),
-    //             TickOutcome::Victory => break 'outer,
-    //         }
-    //     }
-    //     println!("{board}");
-    // }
-
-    println!("game over");
-    //println!("{board}");
-
-    //println!("{}", g.node_count());
 }
 
 fn tick(board: &mut Board, offset: (i32, i32)) -> TickOutcome {
