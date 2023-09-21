@@ -6,7 +6,13 @@ use crossterm::{
     terminal::{self, ClearType},
 };
 use petgraph::{algo::astar, data::Build, graph::Node, stable_graph::NodeIndex, Graph};
-use std::{collections::BTreeSet, fmt::Display, io, ops::ControlFlow, time::Duration};
+use std::{
+    collections::BTreeSet,
+    fmt::Display,
+    io,
+    ops::ControlFlow,
+    time::{Duration, Instant},
+};
 
 const DEAD_MESSAGE: &str = "The berserker king hits you. You die...";
 const WIN_MESSAGE: &str = "CoNgRaTs!";
@@ -148,22 +154,6 @@ impl Display for Board {
 }
 
 fn get_key() -> KeyCode {
-    // return KeyCode::BackTab;
-
-    loop {
-        if poll(Duration::from_millis(100)).unwrap() {
-            let event = read().unwrap();
-            match event {
-                Event::Key(ev) if ev.kind == KeyEventKind::Press => {
-                    return ev.code;
-                }
-                _ => (),
-            }
-        }
-    }
-}
-
-fn get_key_always() -> KeyCode {
     loop {
         if poll(Duration::from_millis(100)).unwrap() {
             let event = read().unwrap();
@@ -274,22 +264,16 @@ fn recurse(
     source_node_index: Option<NodeIndex>,
 ) {
     if depth >= 1000 {
-        println!("Depth too deep, reverting");
-        return;
+        panic!("Recursion too deep, please try with simpler map");
     }
 
     let current_node_index = g.add_node(board.clone());
     if let Some(source_node_index) = source_node_index {
         g.add_edge(source_node_index, current_node_index, 1);
-        println!("Alive(Moved): adding edge {source_node_index:?} -> {current_node_index:?}");
     }
 
     let offsets = [(-1, 0), (1, 0), (0, -1), (0, 1)];
     for offset in offsets {
-        println!("At node {current_node_index:?} with depth {depth}");
-        println!("{board}");
-        get_key();
-
         let mut board_for_tick = board.clone();
         match tick(&mut board_for_tick, offset) {
             TickOutcome::Dead => {}
@@ -309,9 +293,6 @@ fn recurse(
                     continue;
                 }
 
-                println!("Descending into:");
-                println!("{board_for_tick}");
-                get_key();
                 recurse(
                     g,
                     board_for_tick,
@@ -321,11 +302,7 @@ fn recurse(
                 );
             }
             TickOutcome::Victory => {
-                println!("Descending into:");
-                println!("{board_for_tick}");
-                get_key_always();
                 let new_node_index = g.add_node(board_for_tick.clone());
-                println!("Winner: adding edge {source_node_index:?} -> {current_node_index:?}");
                 g.add_edge(current_node_index, new_node_index, 1);
                 winners.push(new_node_index);
             }
@@ -337,10 +314,12 @@ fn recurse(
 fn main() {
     let args = Args::parse();
 
-    if args.auto {
-        let mut board = Board::new_test_01();
+    let mut board = Board::new_test_01();
 
-        println!("{board}");
+    if args.auto {
+        print!("Looking for solution... ");
+
+        let start_instant = Instant::now();
 
         let mut g = Graph::new();
         let mut winners = Vec::new();
@@ -348,24 +327,26 @@ fn main() {
         let depth = 0;
         recurse(&mut g, board, depth, &mut winners, None);
 
-        println!("Got {} winners", winners.len());
         if winners.len() == 1 {
             let winner = winners.pop().unwrap();
             let start = g.node_indices().next().unwrap();
 
-            println!("{start:?} -> {winner:?}");
-
             let path = astar(&g, start, |finish| finish == winner, |_| 1, |_| 0);
-            dbg!(&path);
+
+            println!("found in {:?}", start_instant.elapsed());
 
             if let Some((len, nodes)) = path {
-                println!("replaying path of len {}:", len);
+                println!(
+                    "Keep pressing any key to reveal the path consisting of {} steps",
+                    len + 1
+                );
+                get_key();
                 nodes.iter().enumerate().for_each(|(index, node)| {
                     let _ = execute!(io::stdout(), terminal::Clear(ClearType::All));
-                    println!("Step {index}:");
+                    println!("Step {}:", index + 1);
                     println!("{}", g.raw_nodes()[node.index()].weight);
                     println!();
-                    get_key_always();
+                    get_key();
                 })
             } else {
                 println!("No path?");
@@ -374,7 +355,6 @@ fn main() {
             println!("No clear winner or no winner at all");
         }
     } else {
-        let mut board = Board::new_test_01();
         print_board(&board);
 
         let game_outcome = loop {
