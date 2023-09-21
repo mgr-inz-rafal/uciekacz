@@ -8,10 +8,19 @@
 				"$rustc"
 			],
 			"label": "rust: cargo run",
+			"group": "build"
+		},
+		{
+			"type": "cargo",
+			"command": "check",
+			"problemMatcher": [
+				"$rustc"
+			],
 			"group": {
 				"kind": "build",
 				"isDefault": true
-			}
+			},
+			"label": "rust: cargo check"
 		}
 	]
 }
