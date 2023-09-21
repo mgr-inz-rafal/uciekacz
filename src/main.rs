@@ -10,6 +10,7 @@ use std::{collections::BTreeSet, fmt::Display, io, ops::ControlFlow, time::Durat
 
 const DEAD_MESSAGE: &str = "The berserker king hits you. You die...";
 const WIN_MESSAGE: &str = "CoNgRaTs!";
+const BYE_MESSAGE: &str = "Bye!";
 
 #[derive(Parser, Debug)]
 struct Args {
@@ -185,6 +186,12 @@ enum TickOutcome {
     Dead,
     Alive(MoveOutcome),
     Victory,
+}
+
+enum GameOutcome {
+    Dead,
+    Victory,
+    Exit,
 }
 
 fn move_player(board: &mut Board, offset: (i32, i32)) -> MoveOutcome {
@@ -367,49 +374,62 @@ fn main() {
             println!("No clear winner or no winner at all");
         }
     } else {
-        loop {
-            let mut board = Board::new_test_01();
+        let mut board = Board::new_test_01();
+        print_board(&board);
 
-            // Manual
-            'outer: loop {
-                let key = get_key();
-                if key == KeyCode::Esc {
-                    break;
-                }
-
-                let maybe_offset = match key {
-                    KeyCode::Left => Some((-1, 0)),
-                    KeyCode::Right => Some((1, 0)),
-                    KeyCode::Up => Some((0, -1)),
-                    KeyCode::Down => Some((0, 1)),
-                    _ => None,
-                };
-
-                if let Some(offset) = maybe_offset {
-                    match tick(&mut board, offset) {
-                        TickOutcome::Dead => break 'outer,
-                        TickOutcome::Alive(_) => (),
-                        TickOutcome::Victory => break 'outer,
-                    }
-                }
-                println!("{board}");
+        let game_outcome = loop {
+            let key = get_key();
+            if key == KeyCode::Esc {
+                break GameOutcome::Exit;
             }
 
-            println!("game over");
-            println!("{board}");
+            let maybe_offset = match key {
+                KeyCode::Left => Some((-1, 0)),
+                KeyCode::Right => Some((1, 0)),
+                KeyCode::Up => Some((0, -1)),
+                KeyCode::Down => Some((0, 1)),
+                _ => None,
+            };
+
+            if let Some(offset) = maybe_offset {
+                match tick(&mut board, offset) {
+                    TickOutcome::Dead => break GameOutcome::Dead,
+                    TickOutcome::Alive(_) => (),
+                    TickOutcome::Victory => break GameOutcome::Victory,
+                }
+            }
+            print_board(&board);
+        };
+
+        let _ = execute!(io::stdout(), terminal::Clear(ClearType::All));
+        match game_outcome {
+            GameOutcome::Dead => println!("{}", DEAD_MESSAGE.red()),
+            GameOutcome::Victory => println!("{}", WIN_MESSAGE.green()),
+            GameOutcome::Exit => println!("{}", BYE_MESSAGE.magenta()),
         }
+        println!("game over");
+        println!("{board}");
     }
+}
+
+fn print_board(board: &Board) {
+    let _ = execute!(io::stdout(), terminal::Clear(ClearType::All));
+    println!(
+        "Steal the {} from the {}. Use 🡄 🡆 🡅 🡇 to move",
+        "$".bright_white(),
+        "berserker king".red(),
+    );
+    println!();
+    println!("{board}");
 }
 
 fn tick(board: &mut Board, offset: (i32, i32)) -> TickOutcome {
     let outcome = move_player(board, offset);
     if let MoveOutcome::Moved = outcome {
         if is_dead(&*board) {
-            println!("{}", DEAD_MESSAGE.red());
             return TickOutcome::Dead;
         }
         if is_win(&*board) {
-            println!("{}", WIN_MESSAGE.green());
             return TickOutcome::Victory;
         }
 
@@ -417,7 +437,6 @@ fn tick(board: &mut Board, offset: (i32, i32)) -> TickOutcome {
             let outcome = move_hunter(board);
             if let MoveOutcome::Moved = outcome {
                 if is_dead(&*board) {
-                    println!("{}", DEAD_MESSAGE.red());
                     return TickOutcome::Dead;
                 }
             }
