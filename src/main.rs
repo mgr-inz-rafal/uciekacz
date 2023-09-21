@@ -5,12 +5,10 @@ use crossterm::{
     execute,
     terminal::{self, ClearType},
 };
-use petgraph::{algo::astar, data::Build, graph::Node, stable_graph::NodeIndex, Graph};
+use petgraph::{algo::astar, stable_graph::NodeIndex, Graph};
 use std::{
-    collections::BTreeSet,
     fmt::Display,
     io,
-    ops::ControlFlow,
     time::{Duration, Instant},
 };
 
