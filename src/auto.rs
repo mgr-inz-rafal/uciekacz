@@ -1,5 +1,5 @@
 use std::{
-    collections::{hash_map::DefaultHasher, BTreeMap, BTreeSet},
+    collections::{hash_map::DefaultHasher, BTreeSet, HashMap},
     hash::{Hash, Hasher},
     io,
     time::Instant,
@@ -26,7 +26,7 @@ pub(super) fn auto_play(board: Board) {
     let mut winners = Vec::new();
 
     let mut visited = BTreeSet::default();
-    let mut hash2index = BTreeMap::default();
+    let mut hash2index = HashMap::default();
 
     let depth = 0;
     recurse(
@@ -72,7 +72,7 @@ pub(super) fn auto_play(board: Board) {
 fn add_node(
     board: Board,
     already_visited: &mut BTreeSet<u64>,
-    hash2index: &mut BTreeMap<u64, NodeIndex>,
+    hash2index: &mut HashMap<u64, NodeIndex>,
     g: &mut Graph<Board, i32>,
 ) -> NodeIndex {
     let mut hasher = DefaultHasher::new();
@@ -91,7 +91,7 @@ fn recurse(
     winners: &mut Vec<NodeIndex>,
     source_node_index: Option<NodeIndex>,
     already_visited: &mut BTreeSet<u64>,
-    hash2index: &mut BTreeMap<u64, NodeIndex>,
+    hash2index: &mut HashMap<u64, NodeIndex>,
 ) {
     if depth >= 1000 {
         panic!("Recursion too deep, please try with simpler map");
