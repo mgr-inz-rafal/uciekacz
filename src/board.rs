@@ -23,11 +23,11 @@ impl Board {
         #[rustfmt::skip]
         let tiles = vec![
                 '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#',
-                '#', ' ', ' ', '@', '#', ' ', ' ', ' ', ' ', ' ', '=', '#',
+                '#', ' ', ' ', '@', '#', ' ', ' ', ' ', ' ', ' ', 'K', '#',
                 '#', ' ', ' ', ' ', '#', '#', ' ', ' ', ' ', ' ', ' ', '#',
                 '#', ' ', ' ', ' ', '#', ' ', ' ', ' ', ' ', ' ', ' ', '#',
                 '#', ' ', ' ', ' ', '#', '#', ' ', ' ', ' ', ' ', ' ', '#',
-                '#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '=', ' ', '#',
+                '#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', 'K', ' ', '#',
                 '#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '$', ' ', ' ', '#',
                 '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#',
             ];
@@ -35,26 +35,10 @@ impl Board {
         let player_pos = *Self::find_chars(&tiles, '@', width)
             .first()
             .expect("should have player");
-        let hunters_pos = Self::find_chars(&tiles, '=', width);
+        let hunters_pos = Self::find_chars(&tiles, 'K', width);
         let exit_pos = *Self::find_chars(&tiles, '$', width)
             .first()
             .expect("should have exit");
-
-        // #[rustfmt::skip]
-        // let tiles = vec![
-        //         '#', '#', '#', '#',
-        //         '#', ' ', '@', '#',
-        //         '#', ' ', ' ', '#',
-        //         '#', ' ', '$', '#',
-        //         '#', ' ', ' ', '#',
-        //         '#', ' ', ' ', '#',
-        //         '#', '=', ' ', '#',
-        //         '#', '#', '#', '#'
-        //     ];
-        // let width = 4;
-        // let player_pos = find_char(&tiles, '@', width);
-        // let hunter_pos = find_char(&tiles, '=', width);
-        // let exit_pos = find_char(&tiles, '$', width);
 
         Self {
             tiles,
@@ -104,7 +88,7 @@ impl std::fmt::Display for Board {
                     match c {
                         '#' => "#".blue(),
                         '@' => "@".bright_green(),
-                        '=' => "K".red(),
+                        'K' => "K".red(),
                         '$' => "$".bright_white(),
                         _ => " ".black(),
                     }
