@@ -51,7 +51,14 @@ fn move_hunter_internal(board: &mut Board, offset: (i32, i32), hunter_pos: Pos) 
         return MoveOutcome::NotMoved;
     };
     if at_dest != &'#' && at_dest != &'K' {
-        board.set_at(hunter_pos, ' ');
+        board.set_at(
+            hunter_pos,
+            if hunter_pos == board.exit_pos {
+                '$'
+            } else {
+                ' '
+            },
+        );
         board.set_at(dest, 'K');
         return MoveOutcome::Moved(dest);
     }
