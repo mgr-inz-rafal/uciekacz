@@ -20,7 +20,8 @@ struct Args {
 fn main() {
     let args = Args::parse();
 
-    let board = Board::new_test_01();
+    let _board = Board::new_test_01();
+    let board = Board::from_file("maps/3.txt");
 
     if args.auto {
         auto_play(board);

@@ -1,3 +1,9 @@
+use std::{
+    fs::File,
+    io::{BufRead, BufReader},
+    path::Path,
+};
+
 use colored::Colorize;
 
 use crate::utils::Pos;
@@ -19,6 +25,41 @@ impl std::hash::Hash for Board {
 }
 
 impl Board {
+    pub(super) fn from_file<P: AsRef<Path>>(path: P) -> Self {
+        let file = File::open(&path).expect("cannot open file");
+        let mut reader = BufReader::new(file);
+        let mut line = Default::default();
+        reader.read_line(&mut line).expect("should read line");
+        let line = line.trim_end();
+        let width = line.len();
+
+        let mut tiles = vec![];
+        let file = File::open(path).expect("cannot open file");
+        let reader = BufReader::new(file);
+        for (index, line) in reader.lines().enumerate() {
+            let line = line.expect("should read line");
+            let line = line.trim_end();
+            if line.len() != width {
+                panic!("inconsistent line lengths ({})", index + 1);
+            }
+            tiles.extend(line.chars());
+        }
+        let player_pos = *Self::find_chars(&tiles, '@', width)
+            .first()
+            .expect("should have player");
+        let hunters_pos = Self::find_chars(&tiles, 'K', width);
+        let exit_pos = *Self::find_chars(&tiles, '$', width)
+            .first()
+            .expect("should have exit");
+        Self {
+            tiles,
+            width,
+            player_pos,
+            hunters_pos,
+            exit_pos,
+        }
+    }
+
     pub(super) fn new_test_01() -> Self {
         #[rustfmt::skip]
         let tiles = vec![
