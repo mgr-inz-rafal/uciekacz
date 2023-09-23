@@ -1,4 +1,4 @@
-use std::{io, time::Instant};
+use std::{collections::BTreeSet, io, time::Instant};
 
 use crossterm::{
     execute,
@@ -23,32 +23,33 @@ pub(super) fn auto_play(board: Board) {
     let depth = 0;
     recurse(&mut g, board, depth, &mut winners, None);
 
-    if winners.len() == 1 {
-        let winner = winners.pop().unwrap();
-        let start = g.node_indices().next().unwrap();
+    if winners.is_empty() {
+        println!("No winner path");
+    }
 
-        let path = astar(&g, start, |finish| finish == winner, |_| 1, |_| 0);
+    let paths: BTreeSet<_> = winners
+        .iter()
+        .map(|winner| {
+            let start = g.node_indices().next().unwrap();
+            astar(&g, start, |finish| &finish == winner, |_| 1, |_| 0)
+                .expect("should have path to winner")
+        })
+        .collect();
 
-        println!("found in {:?}", start_instant.elapsed());
-
-        if let Some((len, nodes)) = path {
-            println!(
-                "Keep pressing any key to reveal the path consisting of {} steps",
-                len + 1
-            );
+    println!("found in {:?}", start_instant.elapsed());
+    if let Some((len, nodes)) = paths.first() {
+        println!(
+            "Keep pressing any key to reveal the path consisting of {} steps",
+            len + 1
+        );
+        get_key();
+        nodes.iter().enumerate().for_each(|(index, node)| {
+            let _ = execute!(io::stdout(), terminal::Clear(ClearType::All));
+            println!("Step {}:", index + 1);
+            println!("{}", g.raw_nodes()[node.index()].weight);
+            println!();
             get_key();
-            nodes.iter().enumerate().for_each(|(index, node)| {
-                let _ = execute!(io::stdout(), terminal::Clear(ClearType::All));
-                println!("Step {}:", index + 1);
-                println!("{}", g.raw_nodes()[node.index()].weight);
-                println!();
-                get_key();
-            })
-        } else {
-            println!("No path?");
-        }
-    } else {
-        println!("No clear winner or no winner at all");
+        })
     }
 }
 
@@ -73,7 +74,7 @@ fn recurse(
         let mut board_for_tick = board.clone();
         match tick(&mut board_for_tick, offset) {
             TickOutcome::Dead => {}
-            TickOutcome::Alive(MoveOutcome::Moved) => {
+            TickOutcome::Alive(MoveOutcome::Moved(_)) => {
                 // TODO: Inefficient.
                 let mut already_exists = false;
                 let h = g.clone();

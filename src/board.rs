@@ -8,7 +8,7 @@ pub(super) struct Board {
     pub(super) tiles: Vec<char>,
     pub(super) width: usize,
     pub(super) player_pos: Pos,
-    pub(super) hunter_pos: Pos,
+    pub(super) hunters_pos: Vec<Pos>,
     pub(super) exit_pos: Pos,
 }
 
@@ -17,18 +17,22 @@ impl Board {
         #[rustfmt::skip]
         let tiles = vec![
                 '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#',
-                '#', ' ', ' ', '@', ' ', ' ', ' ', ' ', ' ', ' ', '=', '#',
+                '#', ' ', ' ', '@', '#', ' ', ' ', ' ', ' ', ' ', '=', '#',
                 '#', ' ', ' ', ' ', '#', '#', ' ', ' ', ' ', ' ', ' ', '#',
                 '#', ' ', ' ', ' ', '#', ' ', ' ', ' ', ' ', ' ', ' ', '#',
                 '#', ' ', ' ', ' ', '#', '#', ' ', ' ', ' ', ' ', ' ', '#',
-                '#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '#',
+                '#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '=', ' ', '#',
                 '#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '$', ' ', ' ', '#',
                 '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#',
             ];
         let width = 12;
-        let player_pos = Self::find_char(&tiles, '@', width);
-        let hunter_pos = Self::find_char(&tiles, '=', width);
-        let exit_pos = Self::find_char(&tiles, '$', width);
+        let player_pos = *Self::find_chars(&tiles, '@', width)
+            .first()
+            .expect("should have player");
+        let hunters_pos = Self::find_chars(&tiles, '=', width);
+        let exit_pos = *Self::find_chars(&tiles, '$', width)
+            .first()
+            .expect("should have exit");
 
         // #[rustfmt::skip]
         // let tiles = vec![
@@ -50,7 +54,7 @@ impl Board {
             tiles,
             width,
             player_pos,
-            hunter_pos,
+            hunters_pos,
             exit_pos,
         }
     }
@@ -69,17 +73,17 @@ impl Board {
         (pos.y * self.width as i32 + pos.x) as usize
     }
 
-    fn find_char(tiles: &[char], cc: char, width: usize) -> Pos {
+    fn find_chars(tiles: &[char], cc: char, width: usize) -> Vec<Pos> {
         tiles
             .iter()
             .enumerate()
-            .find(|(_, c)| **c == cc)
+            .filter(|(_, c)| **c == cc)
             .map(|(i, _)| {
                 let y = i / width;
                 let x = i - y * width;
                 Pos::new(x as i32, y as i32)
             })
-            .expect("no {c}")
+            .collect()
     }
 }
 
