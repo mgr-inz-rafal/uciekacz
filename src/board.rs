@@ -12,6 +12,12 @@ pub(super) struct Board {
     pub(super) exit_pos: Pos,
 }
 
+impl std::hash::Hash for Board {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.tiles.hash(state);
+    }
+}
+
 impl Board {
     pub(super) fn new_test_01() -> Self {
         #[rustfmt::skip]

@@ -1,4 +1,9 @@
-use std::{collections::BTreeSet, io, time::Instant};
+use std::{
+    collections::{hash_map::DefaultHasher, BTreeMap, BTreeSet},
+    hash::{Hash, Hasher},
+    io,
+    time::Instant,
+};
 
 use crossterm::{
     execute,
@@ -20,8 +25,19 @@ pub(super) fn auto_play(board: Board) {
     let mut g = Graph::new();
     let mut winners = Vec::new();
 
+    let mut visited = BTreeSet::default();
+    let mut hash2index = BTreeMap::default();
+
     let depth = 0;
-    recurse(&mut g, board, depth, &mut winners, None);
+    recurse(
+        &mut g,
+        board,
+        depth,
+        &mut winners,
+        None,
+        &mut visited,
+        &mut hash2index,
+    );
 
     if winners.is_empty() {
         println!("No winner path");
@@ -53,53 +69,69 @@ pub(super) fn auto_play(board: Board) {
     }
 }
 
+fn add_node(
+    board: Board,
+    already_visited: &mut BTreeSet<u64>,
+    hash2index: &mut BTreeMap<u64, NodeIndex>,
+    g: &mut Graph<Board, i32>,
+) -> NodeIndex {
+    let mut hasher = DefaultHasher::new();
+    board.hash(&mut hasher);
+    let hash = hasher.finish();
+    already_visited.insert(hash);
+    let current_node_index = g.add_node(board.clone());
+    hash2index.insert(hash, current_node_index);
+    current_node_index
+}
+
 fn recurse(
     g: &mut Graph<Board, i32>,
     board: Board,
     depth: i32,
     winners: &mut Vec<NodeIndex>,
     source_node_index: Option<NodeIndex>,
+    already_visited: &mut BTreeSet<u64>,
+    hash2index: &mut BTreeMap<u64, NodeIndex>,
 ) {
     if depth >= 1000 {
         panic!("Recursion too deep, please try with simpler map");
     }
 
-    let current_node_index = g.add_node(board.clone());
+    let current_node_index = add_node(board.clone(), already_visited, hash2index, g);
     if let Some(source_node_index) = source_node_index {
         g.add_edge(source_node_index, current_node_index, 1);
     }
 
     let offsets = [(-1, 0), (1, 0), (0, -1), (0, 1)];
     for offset in offsets {
-        let mut board_for_tick = board.clone();
-        match tick(&mut board_for_tick, offset) {
+        let mut next_board = board.clone();
+        match tick(&mut next_board, offset) {
             TickOutcome::Dead => {}
             TickOutcome::Alive(MoveOutcome::Moved(_)) => {
-                // TODO: Inefficient.
-                let mut already_exists = false;
-                let h = g.clone();
-                let (nodes, _) = h.into_nodes_edges();
-                for (index, node) in nodes.iter().enumerate() {
-                    let inner_board = node.weight.clone();
-                    if inner_board == board_for_tick {
-                        g.add_edge(current_node_index, NodeIndex::new(index), 1);
-                        already_exists = true;
-                    }
-                }
-                if already_exists {
+                let mut hasher = DefaultHasher::new();
+                next_board.hash(&mut hasher);
+                let hash = hasher.finish();
+                if already_visited.contains(&hash) {
+                    g.add_edge(
+                        current_node_index,
+                        *hash2index.get(&hash).expect("should have index in cache"),
+                        1,
+                    );
                     continue;
                 }
 
                 recurse(
                     g,
-                    board_for_tick,
+                    next_board,
                     depth + 1,
                     winners,
                     Some(current_node_index),
+                    already_visited,
+                    hash2index,
                 );
             }
             TickOutcome::Victory => {
-                let new_node_index = g.add_node(board_for_tick.clone());
+                let new_node_index = add_node(next_board, already_visited, hash2index, g);
                 g.add_edge(current_node_index, new_node_index, 1);
                 winners.push(new_node_index);
             }
