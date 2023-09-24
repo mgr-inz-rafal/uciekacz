@@ -61,7 +61,7 @@ pub(super) fn auto_play(board: Board) {
         get_key();
         nodes.iter().enumerate().for_each(|(index, node)| {
             let _ = execute!(io::stdout(), terminal::Clear(ClearType::All));
-            println!("Step {}:", index + 1);
+            println!("Automatic route: Step {}:", index + 1);
             println!("{}", g.raw_nodes()[node.index()].weight);
             println!();
             get_key();

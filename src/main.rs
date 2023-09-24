@@ -15,13 +15,15 @@ struct Args {
     /// If specified, the game will find the solution automatically.
     #[arg(short, long)]
     auto: bool,
+    /// Path to file with map. If not provided, default map will be loaded.
+    #[arg(short, long)]
+    map: Option<String>,
 }
 
 fn main() {
     let args = Args::parse();
 
-    let _board = Board::new_test_01();
-    let board = Board::from_file("maps/3.txt");
+    let board = args.map.map_or(Board::new_test_01(), Board::from_file);
 
     if args.auto {
         auto_play(board);
