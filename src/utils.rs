@@ -26,11 +26,13 @@ impl std::ops::Add<(i32, i32)> for Pos {
 }
 
 pub(super) fn get_key() -> KeyCode {
+    let _ = crossterm::terminal::enable_raw_mode();
     loop {
-        if poll(Duration::from_millis(100)).unwrap() {
+        if poll(Duration::from_millis(1000)).unwrap() {
             let event = read().unwrap();
             match event {
                 Event::Key(ev) if ev.kind == KeyEventKind::Press => {
+                    let _ = crossterm::terminal::disable_raw_mode();
                     return ev.code;
                 }
                 _ => (),
