@@ -142,8 +142,10 @@ fn is_win(board: &Board) -> bool {
 pub(super) fn print_board(board: &Board) {
     let _ = execute!(io::stdout(), terminal::Clear(ClearType::All));
     println!(
-        "Steal the {} from the {}. Use 🡄 🡆 🡅 🡇 to move",
+        "{} {} {} {}. Use arrow keys to move",
+        "Steal the".green(),
         "$".bright_white(),
+        "from the".green(),
         "berserker king".red(),
     );
     println!();
