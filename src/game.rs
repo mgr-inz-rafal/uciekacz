@@ -211,7 +211,7 @@ fn gravity(board: &mut BoardTensor) {
             for x in (0..12).rev() {
                 let pos = Pos::new(x, y);
                 match board.at(pos) {
-                    Some(1) | Some(2) => {
+                    Some(1) | Some(2) | Some(131) | Some(132) => {
                         let new_pos = Pos::new(pos.x, pos.y + 1);
                         let c = *board.at(pos).unwrap();
                         if let Some(0) = board.at(new_pos) {
