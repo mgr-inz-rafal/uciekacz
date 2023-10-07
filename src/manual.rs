@@ -8,8 +8,11 @@ use crossterm::{
 };
 
 use crate::{
-    board::Board,
-    game::{print_board, tick, GameOutcome, TickOutcome},
+    board::{Board, BoardTensor},
+    game::{
+        print_board, print_board_tensor, tick, tick_tensor, GameOutcome, GameOutcomeTensor,
+        TickOutcome,
+    },
     utils::get_key,
 };
 
@@ -49,6 +52,39 @@ pub(super) fn manual_play(mut board: Board) {
         GameOutcome::Dead => println!("{}", DEAD_MESSAGE.red()),
         GameOutcome::Victory => println!("{}", WIN_MESSAGE.green()),
         GameOutcome::Exit => println!("{}", BYE_MESSAGE.magenta()),
+    }
+    println!("game over");
+    println!("{board}");
+}
+
+pub(super) fn manual_play_tensor(mut board: BoardTensor) {
+    print_board_tensor(&board);
+
+    let game_outcome = loop {
+        let key = get_key();
+        if key == KeyCode::Esc {
+            break GameOutcomeTensor::Exit;
+        }
+
+        match tick_tensor(&mut board, key) {
+            crate::game::TickOutcomeTensor::Continue => (),
+            crate::game::TickOutcomeTensor::Victory => break GameOutcomeTensor::Victory,
+        }
+
+        // if let Some(offset) = maybe_offset {
+        //     match tick(&mut board, offset) {
+        //         TickOutcome::Dead => break GameOutcome::Dead,
+        //         TickOutcome::Alive(_) => (),
+        //         TickOutcome::Victory => break GameOutcome::Victory,
+        //     }
+        // }
+        print_board_tensor(&board);
+    };
+
+    let _ = execute!(io::stdout(), terminal::Clear(ClearType::All));
+    match game_outcome {
+        GameOutcomeTensor::Victory => println!("{}", WIN_MESSAGE.green()),
+        GameOutcomeTensor::Exit => println!("{}", BYE_MESSAGE.magenta()),
     }
     println!("game over");
     println!("{board}");

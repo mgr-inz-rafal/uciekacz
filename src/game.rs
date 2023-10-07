@@ -2,11 +2,15 @@ use std::io;
 
 use colored::Colorize;
 use crossterm::{
+    event::KeyCode,
     execute,
     terminal::{self, ClearType},
 };
 
-use crate::{board::Board, utils::Pos};
+use crate::{
+    board::{Board, BoardTensor},
+    utils::Pos,
+};
 
 #[derive(PartialEq)]
 pub(super) enum MoveOutcome {
@@ -20,8 +24,18 @@ pub(super) enum TickOutcome {
     Victory,
 }
 
+pub(super) enum TickOutcomeTensor {
+    Continue,
+    Victory,
+}
+
 pub(super) enum GameOutcome {
     Dead,
+    Victory,
+    Exit,
+}
+
+pub(super) enum GameOutcomeTensor {
     Victory,
     Exit,
 }
@@ -152,6 +166,22 @@ pub(super) fn print_board(board: &Board) {
     println!("{board}");
 }
 
+pub(super) fn print_board_tensor(board: &BoardTensor) {
+    let _ = execute!(io::stdout(), terminal::Clear(ClearType::All));
+    println!(
+        "{} {} {}",
+        board.amygdala_count.to_string().yellow(),
+        if board.amygdala_count == 1 {
+            "amygdala".white()
+        } else {
+            "amygdalas".white()
+        },
+        "left, keep rotating!".green()
+    );
+    println!();
+    println!("{board}");
+}
+
 pub(super) fn tick(board: &mut Board, offset: (i32, i32)) -> TickOutcome {
     let outcome = move_player(board, offset);
     if let MoveOutcome::Moved(_) = outcome {
@@ -171,4 +201,82 @@ pub(super) fn tick(board: &mut Board, offset: (i32, i32)) -> TickOutcome {
         return TickOutcome::Alive(MoveOutcome::Moved(Pos::new(0, 0)));
     }
     TickOutcome::Alive(MoveOutcome::NotMoved)
+}
+
+pub(super) fn tick_tensor(board: &mut BoardTensor, key: KeyCode) -> TickOutcomeTensor {
+    match key {
+        KeyCode::Left => {
+            let pos = board.player_pos;
+            let new_pos = Pos::new(pos.x - 1, pos.y);
+            match board.at(new_pos) {
+                Some(0) => {
+                    board.set_at(pos, 0);
+                    board.set_at(new_pos, 1);
+                    board.player_pos = new_pos;
+                }
+                Some(2) => {
+                    board.set_at(pos, 0);
+                    board.set_at(new_pos, 1);
+                    board.player_pos = new_pos;
+                    board.amygdala_count -= 1;
+                    if board.amygdala_count == 0 {
+                        return TickOutcomeTensor::Victory;
+                    }
+                }
+                _ => return TickOutcomeTensor::Continue,
+            }
+        }
+        KeyCode::Right => {
+            let pos = board.player_pos;
+            let new_pos = Pos::new(pos.x + 1, pos.y);
+            match board.at(new_pos) {
+                Some(0) => {
+                    board.set_at(pos, 0);
+                    board.set_at(new_pos, 1);
+                    board.player_pos = new_pos;
+                }
+                Some(2) => {
+                    board.set_at(pos, 0);
+                    board.set_at(new_pos, 1);
+                    board.player_pos = new_pos;
+                    board.amygdala_count -= 1;
+                    if board.amygdala_count == 0 {
+                        return TickOutcomeTensor::Victory;
+                    }
+                }
+                _ => return TickOutcomeTensor::Continue,
+            }
+        }
+        KeyCode::Up => {
+            rotate_right(board);
+        }
+        KeyCode::Down => {
+            rotate_left(board);
+        }
+        _ => return TickOutcomeTensor::Continue,
+    }
+
+    TickOutcomeTensor::Continue
+}
+
+fn rotate_right(board: &mut BoardTensor) {
+    let mut new_board = board.clone();
+    for y in 0..12 {
+        for x in 0..12 {
+            let c = board.at(Pos::new(x, y)).unwrap();
+            let new_pos = Pos::new(11 - y, x);
+            if *c == 1 {
+                new_board.player_pos = new_pos;
+            }
+            new_board.set_at(new_pos, *c)
+        }
+    }
+    *board = new_board;
+}
+
+fn rotate_left(board: &mut BoardTensor) {
+    // :-)))
+    rotate_right(board);
+    rotate_right(board);
+    rotate_right(board);
 }

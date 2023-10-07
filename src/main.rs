@@ -7,8 +7,8 @@ mod utils;
 use clap::Parser;
 
 use auto::auto_play;
-use board::Board;
-use manual::manual_play;
+use board::{Board, BoardTensor};
+use manual::{manual_play, manual_play_tensor};
 
 #[derive(Parser, Debug)]
 struct Args {
@@ -23,11 +23,13 @@ struct Args {
 fn main() {
     let args = Args::parse();
 
-    let board = args.map.map_or(Board::new_test_01(), Board::from_file);
+    let board = args
+        .map
+        .map_or(BoardTensor::new_test_01(), BoardTensor::from_file);
 
     if args.auto {
-        auto_play(board);
+        //auto_play(board);
     } else {
-        manual_play(board);
+        manual_play_tensor(board);
     }
 }
