@@ -203,7 +203,40 @@ pub(super) fn tick(board: &mut Board, offset: (i32, i32)) -> TickOutcome {
     TickOutcome::Alive(MoveOutcome::NotMoved)
 }
 
+fn gravity(board: &mut BoardTensor) {
+    let mut moved = true;
+    while moved {
+        moved = false;
+        for y in (0..12).rev() {
+            for x in (0..12).rev() {
+                let pos = Pos::new(x, y);
+                match board.at(pos) {
+                    Some(1) | Some(2) => {
+                        let new_pos = Pos::new(pos.x, pos.y + 1);
+                        let c = *board.at(pos).unwrap();
+                        if let Some(0) = board.at(new_pos) {
+                            moved = true;
+                            board.set_at(pos, 0);
+                            board.set_at(new_pos, c);
+                            if c == 1 {
+                                board.player_pos = new_pos;
+                            }
+                        }
+                    }
+                    _ => (),
+                }
+            }
+        }
+    }
+}
+
 pub(super) fn tick_tensor(board: &mut BoardTensor, key: KeyCode) -> TickOutcomeTensor {
+    let outcome = interpret_key(key, board);
+    gravity(board);
+    outcome
+}
+
+fn interpret_key(key: KeyCode, board: &mut BoardTensor) -> TickOutcomeTensor {
     match key {
         KeyCode::Left => {
             let pos = board.player_pos;
@@ -255,8 +288,7 @@ pub(super) fn tick_tensor(board: &mut BoardTensor, key: KeyCode) -> TickOutcomeT
         }
         _ => return TickOutcomeTensor::Continue,
     }
-
-    TickOutcomeTensor::Continue
+    return TickOutcomeTensor::Continue;
 }
 
 fn rotate_right(board: &mut BoardTensor) {
