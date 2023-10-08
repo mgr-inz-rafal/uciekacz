@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{process::exit, time::Duration};
 
 use crossterm::event::{poll, read, Event, KeyCode, KeyEventKind};
 
@@ -33,6 +33,9 @@ pub(super) fn get_key() -> KeyCode {
             match event {
                 Event::Key(ev) if ev.kind == KeyEventKind::Press => {
                     let _ = crossterm::terminal::disable_raw_mode();
+                    if ev.code == KeyCode::Esc {
+                        exit(-1);
+                    }
                     return ev.code;
                 }
                 _ => (),
