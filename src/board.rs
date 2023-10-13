@@ -5,6 +5,7 @@ use std::{
 };
 
 use colored::Colorize;
+use crossterm::event::KeyCode;
 
 use crate::utils::Pos;
 
@@ -148,6 +149,7 @@ pub(super) struct BoardTensor {
     pub(super) width: usize,
     pub(super) player_pos: Pos,
     pub(super) amygdala_count: usize,
+    pub(super) transitioned_via: Option<KeyCode>,
 }
 
 impl std::hash::Hash for BoardTensor {
@@ -189,9 +191,9 @@ impl BoardTensor {
             3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
             3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
             3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
-            3, 3, 3, 3, 0, 0, 0, 2, 3, 3, 3, 3,
-            3, 3, 3, 3, 0, 0, 0, 131, 3, 3, 3, 3,
-            3, 3, 3, 3, 2, 0, 1, 0, 3, 3, 3, 3,
+            3, 3, 3, 3, 0, 0, 0, 0, 3, 3, 3, 3,
+            3, 3, 3, 3, 0, 0, 0, 0, 3, 3, 3, 3,
+            3, 3, 3, 3, 2, 0, 1, 2, 3, 3, 3, 3,
             3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
             3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
             3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
@@ -223,6 +225,7 @@ impl BoardTensor {
             width,
             player_pos,
             amygdala_count,
+            transitioned_via: None,
         }
     }
 
@@ -255,6 +258,7 @@ impl BoardTensor {
             width,
             player_pos,
             amygdala_count,
+            transitioned_via: None,
         }
     }
 
