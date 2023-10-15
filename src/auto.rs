@@ -241,16 +241,36 @@ impl IntoIterator for Route {
 
 pub(super) fn auto_play_tensor(board: BoardTensor) {
     println!("Looking for solution... ");
-    const LEN: usize = 2;
+    const LEN: usize = 10;
+
+    println!("{board}");
 
     let start_instant = Instant::now();
 
     let route = Route::new(LEN);
 
-    route.clone().into_iter().par_bridge().for_each(|step| {
-        println!("{step}");
-        //get_key();
-    });
+    route
+        .clone()
+        .into_iter()
+        .par_bridge()
+        .for_each(move |path| {
+            let mut next_board = board.clone();
+            println!("Exercising {path}");
+            for (index, step) in path.r.iter().enumerate() {
+                let outcome = tick_tensor(&mut next_board, *step);
+                match outcome {
+                    TickOutcomeTensor::Continue => (),
+                    TickOutcomeTensor::Victory => {
+                        println!(
+                            "have a winner using the following path at step {index}:\n{}",
+                            path
+                        );
+                        get_key();
+                    }
+                }
+                println!("{next_board}");
+            }
+        });
 
     println!("Solution found in {:?}", start_instant.elapsed());
 
