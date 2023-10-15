@@ -12,6 +12,7 @@ use crossterm::{
 };
 use multimap::MultiMap;
 use petgraph::{algo::astar, stable_graph::NodeIndex, Graph};
+use rayon::prelude::{IntoParallelIterator, ParallelBridge, ParallelIterator};
 
 use crate::{
     board::{Board, BoardTensor},
@@ -142,84 +143,123 @@ fn recurse(
     }
 }
 
+#[derive(Clone)]
+struct Route {
+    r: Vec<KeyCode>,
+}
+
+impl Route {
+    fn new(len: usize) -> Self {
+        Self {
+            r: std::iter::repeat(KeyCode::Left).take(len).collect(),
+        }
+    }
+
+    pub fn iter(&self) -> RouteIterator {
+        RouteIterator::new((*self).clone())
+    }
+}
+
+impl std::fmt::Display for Route {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for c in &self.r {
+            write!(
+                f,
+                "{}",
+                match c {
+                    KeyCode::Left => 'L',
+                    KeyCode::Right => 'R',
+                    KeyCode::Up => 'U',
+                    KeyCode::Down => 'D',
+                    _ => panic!("unsupported route element: {c:?}"),
+                }
+            )?
+        }
+        Ok(())
+    }
+}
+
+struct RouteIterator {
+    current: Route,
+    feed_initial: bool,
+}
+
+impl RouteIterator {
+    fn inc(&mut self, pos: usize) -> bool {
+        let c = self.current.r[pos];
+        match c {
+            KeyCode::Left => self.current.r[pos] = KeyCode::Right,
+            KeyCode::Right => self.current.r[pos] = KeyCode::Up,
+            KeyCode::Up => self.current.r[pos] = KeyCode::Down,
+            KeyCode::Down => {
+                self.current.r[pos] = KeyCode::Left;
+                if pos > 0 {
+                    if !self.inc(pos - 1) {
+                        return false;
+                    }
+                } else {
+                    return false;
+                }
+            }
+            _ => panic!("unsupported route element: {c:?}"),
+        }
+        true
+    }
+
+    fn advance(&mut self) -> bool {
+        self.inc(self.current.r.len() - 1)
+    }
+
+    fn new(r: Route) -> Self {
+        Self {
+            current: r,
+            feed_initial: true,
+        }
+    }
+}
+
+impl Iterator for RouteIterator {
+    type Item = Route;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.feed_initial {
+            self.feed_initial = false;
+            return Some(self.current.clone());
+        }
+        self.advance().then_some(self.current.clone())
+    }
+}
+
+impl IntoIterator for Route {
+    type Item = Route;
+    type IntoIter = RouteIterator;
+
+    fn into_iter(self) -> Self::IntoIter {
+        RouteIterator::new(self)
+    }
+}
+
 pub(super) fn auto_play_tensor(board: BoardTensor) {
     println!("Looking for solution... ");
+    const LEN: usize = 2;
 
     let start_instant = Instant::now();
 
-    //let mut g = Graph::new();
-    let mut winner: Option<(i32, Vec<NodeIndex>)> = None;
-    let mut depth = 0;
-    let mut have = BTreeSet::new();
-    let mut tr = MultiMap::new();
-    tr.insert(depth, board.clone());
-    let mut hasher = DefaultHasher::new();
-    board.hash(&mut hasher);
-    let hash = hasher.finish();
-    have.insert(hash);
+    let route = Route::new(LEN);
 
-    loop {
-        // println!(
-        //     "boards at depth={depth}: {}",
-        //     tr.get_vec(&depth).unwrap().len()
-        // );
-        //        get_key();
-        let boards_at_depth = tr.get_vec(&depth).unwrap().clone();
-        println!("{} boards at depth {depth}", boards_at_depth.len());
-        for x in boards_at_depth {
-            for shift in [KeyCode::Left, KeyCode::Right, KeyCode::Up, KeyCode::Down] {
-                let mut new_board = x.clone();
-                //                println!("{new_board}");
-                //                get_key();
-                let victory = match tick_tensor(&mut new_board, shift) {
-                    TickOutcomeTensor::Continue => false,
-                    TickOutcomeTensor::Victory => true,
-                };
-                let mut hasher = DefaultHasher::new();
-                new_board.hash(&mut hasher);
-                let hash = hasher.finish();
-                if !have.contains(&hash) {
-                    if victory {
-                        println!("Victory at depth={depth}!");
-                        println!("{new_board}");
-                        get_key();
-                    }
-                    tr.insert(depth + 1, new_board.clone());
-                } else {
-                    println!("already have!");
-                }
-                //                println!("Inserting at {}:\n{new_board} from {shift:?}", depth + 1);
-                //                get_key();
-            }
-        }
-        depth += 1
+    let x = route.clone().into_iter();
+
+    let y = x.par_bridge();
+    let z: Vec<_> = y.collect();
+    //assert_eq!(z.len(), 4usize.pow(LEN as u32));
+
+    for step in z {
+        println!("{step}");
+        //get_key();
     }
 
-    /*
-    let mut visited = BTreeSet::default();
-    let mut hash2index = HashMap::default();
+    println!("Solution found in {:?}", start_instant.elapsed());
 
-    let score = 0;
-    let depth = 0;
-    recurse_tensor(
-        &mut g,
-        board,
-        depth,
-        score,
-        1,
-        &mut winner,
-        None,
-        &mut visited,
-        &mut hash2index,
-    );
-    */
-
-    // if winner.is_none() {
-    //     println!("No winner path");
-    //     return;
-    // }
-
-    // println!("Solution found in {:?}", start_instant.elapsed());
     // if let Some((len, nodes)) = winner {
     //     println!(
     //         "Keep pressing any key to reveal the path consisting of {} steps",
