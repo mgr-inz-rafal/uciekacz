@@ -247,16 +247,10 @@ pub(super) fn auto_play_tensor(board: BoardTensor) {
 
     let route = Route::new(LEN);
 
-    let x = route.clone().into_iter();
-
-    let y = x.par_bridge();
-    let z: Vec<_> = y.collect();
-    //assert_eq!(z.len(), 4usize.pow(LEN as u32));
-
-    for step in z {
+    route.clone().into_iter().par_bridge().for_each(|step| {
         println!("{step}");
         //get_key();
-    }
+    });
 
     println!("Solution found in {:?}", start_instant.elapsed());
 
