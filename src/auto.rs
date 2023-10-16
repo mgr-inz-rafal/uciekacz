@@ -2,6 +2,10 @@ use std::{
     collections::{hash_map::DefaultHasher, BTreeSet, HashMap},
     hash::{Hash, Hasher},
     io,
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc,
+    },
     time::Instant,
 };
 
@@ -143,7 +147,7 @@ fn recurse(
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct Route {
     r: Vec<KeyCode>,
 }
@@ -239,40 +243,111 @@ impl IntoIterator for Route {
     }
 }
 
-pub(super) fn auto_play_tensor(board: BoardTensor) {
-    println!("Looking for solution... ");
-    const LEN: usize = 10;
+#[derive(Debug)]
+struct Winner {
+    step: usize,
+    route: Route,
+}
 
-    println!("{board}");
+pub(super) fn auto_play_tensor(mut board: BoardTensor) {
+    println!("Looking for solution... ");
+    const LEN: usize = 25;
+
+    //println!("{board}");
 
     let start_instant = Instant::now();
 
+    const TOTAL_COMBINATIONS: u64 = 4u64.pow(LEN as u32);
+
     let route = Route::new(LEN);
 
-    route
-        .clone()
-        .into_iter()
-        .par_bridge()
-        .for_each(move |path| {
-            let mut next_board = board.clone();
-            println!("Exercising {path}");
-            for (index, step) in path.r.iter().enumerate() {
-                let outcome = tick_tensor(&mut next_board, *step);
-                match outcome {
-                    TickOutcomeTensor::Continue => (),
-                    TickOutcomeTensor::Victory => {
+    let current_winner: Arc<Mutex<Option<Winner>>> = Arc::new(Mutex::new(None));
+    let counter = AtomicU64::new(0);
+
+    route.clone().into_iter().par_bridge().for_each(|path| {
+        let mut next_board = board.clone();
+        //        println!("Exercising {path}");
+        for (index, step) in path.r.iter().enumerate() {
+            counter.fetch_add(1, Ordering::Relaxed);
+            let current_counter = counter.load(Ordering::Relaxed);
+            if current_counter % 10000000 == 0 {
+                let cw = current_winner.lock().unwrap();
+                match &*cw {
+                    Some(Winner { step, .. }) => {
                         println!(
-                            "have a winner using the following path at step {index}:\n{}",
-                            path
-                        );
-                        get_key();
+                            "At {current_counter} ({}%) the winner is: {}",
+                            (100 * current_counter / TOTAL_COMBINATIONS) / 10,
+                            step,
+                        )
+                    }
+                    None => println!(
+                        "At {current_counter} ({}%) there is no winner",
+                        (100 * current_counter / TOTAL_COMBINATIONS) / 10,
+                    ),
+                }
+            }
+            let outcome = tick_tensor(&mut next_board, *step);
+            match outcome {
+                TickOutcomeTensor::Continue => (),
+                TickOutcomeTensor::Victory => {
+                    let mut cw = current_winner.lock().unwrap();
+                    // println!(
+                    //     "have a winner using the following path at step {index}:\n{}",
+                    //     path.clone(),
+                    // );
+                    match &mut *cw {
+                        None => {
+                            // println!(
+                            //     "Currently there's no winner, so this is becomes the best one"
+                            // );
+                            *cw = Some(Winner {
+                                step: index,
+                                route: path.clone(),
+                            });
+                        }
+                        Some(Winner { step, .. }) => {
+                            if &index < step {
+                                // println!(
+                                //     "And this winner is better than the previous one at {step}"
+                                // );
+                                *cw = Some(Winner {
+                                    step: index,
+                                    route: path.clone(),
+                                });
+                            } else {
+                                //println!("But it is worse than the previous one at {step}");
+                            }
+                        }
                     }
                 }
-                println!("{next_board}");
             }
-        });
+        }
+    });
 
     println!("Solution found in {:?}", start_instant.elapsed());
+
+    let mut cw = current_winner.lock().unwrap();
+    match &*cw {
+        Some(Winner { step, route }) => {
+            println!(
+                "Keep pressing any key to reveal the path consisting of {} steps",
+                step + 2
+            );
+            get_key();
+            let mut index = 0;
+            println!("Step {}/{}...", index + 1, step + 2);
+            println!("{board}");
+            get_key();
+            for action in route.r.iter().take(*step + 1) {
+                index += 1;
+                let _ = tick_tensor(&mut board, *action);
+                println!("Step {}/{}...", index + 1, step + 2);
+                println!("{board}");
+                get_key();
+            }
+        }
+        None => println!("No winner"),
+    }
 
     // if let Some((len, nodes)) = winner {
     //     println!(
