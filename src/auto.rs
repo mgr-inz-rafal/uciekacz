@@ -197,8 +197,8 @@ impl RouteIterator {
             KeyCode::Up => self.current.r[pos] = KeyCode::Down,
             KeyCode::Down => {
                 self.current.r[pos] = KeyCode::Left;
-                if pos > 0 {
-                    if !self.inc(pos - 1) {
+                if pos < self.current.r.len() - 1 {
+                    if !self.inc(pos + 1) {
                         return false;
                     }
                 } else {
@@ -211,7 +211,7 @@ impl RouteIterator {
     }
 
     fn advance(&mut self) -> bool {
-        self.inc(self.current.r.len() - 1)
+        self.inc(0)
     }
 
     fn new(r: Route) -> Self {
@@ -251,21 +251,29 @@ struct Winner {
 
 pub(super) fn auto_play_tensor(mut board: BoardTensor) {
     println!("Looking for solution... ");
-    const LEN: usize = 30;
+    const LEN: usize = 2;
 
     //println!("{board}");
 
     let start_instant = Instant::now();
 
     const TOTAL_ROUTES: u64 = 4u64.pow(LEN as u32);
-    println!("Total routes to check (millions): {}", TOTAL_ROUTES / 1_000_000);
+    println!(
+        "Total routes to check (millions): {}",
+        TOTAL_ROUTES / 1_000_000
+    );
 
     let route = Route::new(LEN);
+
+    for x in route.iter() {
+        println!("{x}");
+    }
+    panic!();
 
     let current_winner: Arc<Mutex<Option<Winner>>> = Arc::new(Mutex::new(None));
     let counter = AtomicU64::new(0);
 
-    route.clone().into_iter().par_bridge().for_each(|path| {
+    route.into_iter().par_bridge().for_each(|path| {
         let mut next_board = board.clone();
         //        println!("Exercising {path}");
         counter.fetch_add(1, Ordering::Relaxed);
