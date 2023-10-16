@@ -251,13 +251,13 @@ struct Winner {
 
 pub(super) fn auto_play_tensor(mut board: BoardTensor) {
     println!("Looking for solution... ");
-    const LEN: usize = 25;
+    const LEN: usize = 10;
 
     //println!("{board}");
 
     let start_instant = Instant::now();
 
-    const TOTAL_COMBINATIONS: u64 = 4u64.pow(LEN as u32);
+    const TOTAL_ROUTES: u64 = 4u64.pow(LEN as u32);
 
     let route = Route::new(LEN);
 
@@ -267,25 +267,25 @@ pub(super) fn auto_play_tensor(mut board: BoardTensor) {
     route.clone().into_iter().par_bridge().for_each(|path| {
         let mut next_board = board.clone();
         //        println!("Exercising {path}");
-        for (index, step) in path.r.iter().enumerate() {
-            counter.fetch_add(1, Ordering::Relaxed);
-            let current_counter = counter.load(Ordering::Relaxed);
-            if current_counter % 10000000 == 0 {
-                let cw = current_winner.lock().unwrap();
-                match &*cw {
-                    Some(Winner { step, .. }) => {
-                        println!(
-                            "At {current_counter} ({}%) the winner is: {}",
-                            (100 * current_counter / TOTAL_COMBINATIONS) / 10,
-                            step,
-                        )
-                    }
-                    None => println!(
-                        "At {current_counter} ({}%) there is no winner",
-                        (100 * current_counter / TOTAL_COMBINATIONS) / 10,
-                    ),
+        counter.fetch_add(1, Ordering::Relaxed);
+        let current_counter = counter.load(Ordering::Relaxed);
+        if current_counter % 10000 == 0 {
+            let cw = current_winner.lock().unwrap();
+            match &*cw {
+                Some(Winner { step, .. }) => {
+                    println!(
+                        "At {current_counter} ({}%) the winner is: {}",
+                        (100 * current_counter / TOTAL_ROUTES),
+                        step,
+                    )
                 }
+                None => println!(
+                    "At {current_counter} ({}%) there is no winner",
+                    (100 * current_counter / TOTAL_ROUTES),
+                ),
             }
+        }
+        for (index, step) in path.r.iter().enumerate() {
             let outcome = tick_tensor(&mut next_board, *step);
             match outcome {
                 TickOutcomeTensor::Continue => (),
