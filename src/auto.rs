@@ -251,13 +251,14 @@ struct Winner {
 
 pub(super) fn auto_play_tensor(mut board: BoardTensor) {
     println!("Looking for solution... ");
-    const LEN: usize = 10;
+    const LEN: usize = 30;
 
     //println!("{board}");
 
     let start_instant = Instant::now();
 
     const TOTAL_ROUTES: u64 = 4u64.pow(LEN as u32);
+    println!("Total routes to check (millions): {}", TOTAL_ROUTES / 1_000_000);
 
     let route = Route::new(LEN);
 
@@ -269,19 +270,19 @@ pub(super) fn auto_play_tensor(mut board: BoardTensor) {
         //        println!("Exercising {path}");
         counter.fetch_add(1, Ordering::Relaxed);
         let current_counter = counter.load(Ordering::Relaxed);
-        if current_counter % 10000 == 0 {
+        if current_counter % 1000000 == 0 {
             let cw = current_winner.lock().unwrap();
             match &*cw {
                 Some(Winner { step, .. }) => {
                     println!(
-                        "At {current_counter} ({}%) the winner is: {}",
-                        (100 * current_counter / TOTAL_ROUTES),
+                        "At {current_counter} ({:.6}%) the winner is: {}",
+                        (100 as f64 * current_counter as f64 / TOTAL_ROUTES as f64),
                         step,
                     )
                 }
                 None => println!(
-                    "At {current_counter} ({}%) there is no winner",
-                    (100 * current_counter / TOTAL_ROUTES),
+                    "At {current_counter} ({:.6}%) there is no winner",
+                    (100 as f64 * current_counter as f64 / TOTAL_ROUTES as f64),
                 ),
             }
         }
