@@ -251,7 +251,7 @@ struct Winner {
 
 pub(super) fn auto_play_tensor(mut board: BoardTensor) {
     println!("Looking for solution... ");
-    const LEN: usize = 2;
+    const LEN: usize = 20;
 
     //println!("{board}");
 
@@ -264,11 +264,6 @@ pub(super) fn auto_play_tensor(mut board: BoardTensor) {
     );
 
     let route = Route::new(LEN);
-
-    for x in route.iter() {
-        println!("{x}");
-    }
-    panic!();
 
     let current_winner: Arc<Mutex<Option<Winner>>> = Arc::new(Mutex::new(None));
     let counter = AtomicU64::new(0);
