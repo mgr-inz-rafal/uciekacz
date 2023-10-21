@@ -230,13 +230,17 @@ fn gravity(board: &mut BoardTensor) {
     }
 }
 
-pub(super) fn tick_tensor(board: &mut BoardTensor, key: KeyCode) -> TickOutcomeTensor {
-    let outcome = interpret_key(key, board);
+pub(super) fn tick_tensor(
+    board: &mut BoardTensor,
+    key: KeyCode,
+    my_score: &mut u16,
+) -> TickOutcomeTensor {
+    let outcome = interpret_key(key, board, my_score);
     gravity(board);
     outcome
 }
 
-fn interpret_key(key: KeyCode, board: &mut BoardTensor) -> TickOutcomeTensor {
+fn interpret_key(key: KeyCode, board: &mut BoardTensor, my_score: &mut u16) -> TickOutcomeTensor {
     match key {
         KeyCode::Left => {
             let pos = board.player_pos;
@@ -246,12 +250,14 @@ fn interpret_key(key: KeyCode, board: &mut BoardTensor) -> TickOutcomeTensor {
                     board.set_at(pos, 0);
                     board.set_at(new_pos, 1);
                     board.player_pos = new_pos;
+                    *my_score += 1;
                 }
                 Some(2) => {
                     board.set_at(pos, 0);
                     board.set_at(new_pos, 1);
                     board.player_pos = new_pos;
                     board.amygdala_count -= 1;
+                    *my_score += 1;
                     if board.amygdala_count == 0 {
                         return TickOutcomeTensor::Victory;
                     }
@@ -267,12 +273,14 @@ fn interpret_key(key: KeyCode, board: &mut BoardTensor) -> TickOutcomeTensor {
                     board.set_at(pos, 0);
                     board.set_at(new_pos, 1);
                     board.player_pos = new_pos;
+                    *my_score += 1;
                 }
                 Some(2) => {
                     board.set_at(pos, 0);
                     board.set_at(new_pos, 1);
                     board.player_pos = new_pos;
                     board.amygdala_count -= 1;
+                    *my_score += 1;
                     if board.amygdala_count == 0 {
                         return TickOutcomeTensor::Victory;
                     }
@@ -281,9 +289,11 @@ fn interpret_key(key: KeyCode, board: &mut BoardTensor) -> TickOutcomeTensor {
             }
         }
         KeyCode::Up => {
+            *my_score += 2;
             rotate_right(board);
         }
         KeyCode::Down => {
+            *my_score += 2;
             rotate_left(board);
         }
         _ => return TickOutcomeTensor::Continue,

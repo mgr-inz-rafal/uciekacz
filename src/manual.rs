@@ -60,13 +60,15 @@ pub(super) fn manual_play(mut board: Board) {
 pub(super) fn manual_play_tensor(mut board: BoardTensor) {
     print_board_tensor(&board);
 
+    let mut my_score = 0;
+
     let game_outcome = loop {
         let key = get_key();
         if key == KeyCode::Esc {
             break GameOutcomeTensor::Exit;
         }
 
-        match tick_tensor(&mut board, key) {
+        match tick_tensor(&mut board, key, &mut my_score) {
             crate::game::TickOutcomeTensor::Continue => (),
             crate::game::TickOutcomeTensor::Victory => break GameOutcomeTensor::Victory,
         }

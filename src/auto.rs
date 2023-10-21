@@ -251,16 +251,17 @@ struct Winner {
 
 pub(super) fn auto_play_tensor(mut board: BoardTensor) {
     println!("Looking for solution... ");
-    const LEN: usize = 20;
+    const LEN: usize = 50;
+    const MAX_SCORE: u16 = 100;
 
     //println!("{board}");
 
     let start_instant = Instant::now();
 
-    const TOTAL_ROUTES: u64 = 4u64.pow(LEN as u32);
+    let total_routes: f64 = 4f64.powf(LEN as f64);
     println!(
         "Total routes to check (millions): {}",
-        TOTAL_ROUTES / 1_000_000
+        total_routes / 1_000_000_f64
     );
 
     let route = Route::new(LEN);
@@ -269,28 +270,32 @@ pub(super) fn auto_play_tensor(mut board: BoardTensor) {
     let counter = AtomicU64::new(0);
 
     route.into_iter().par_bridge().for_each(|path| {
+        let mut my_score = 0;
         let mut next_board = board.clone();
         //        println!("Exercising {path}");
         counter.fetch_add(1, Ordering::Relaxed);
         let current_counter = counter.load(Ordering::Relaxed);
-        if current_counter % 1000000 == 0 {
+        if current_counter % 10000000 == 0 {
             let cw = current_winner.lock().unwrap();
             match &*cw {
                 Some(Winner { step, .. }) => {
                     println!(
                         "At {current_counter} ({:.6}%) the winner is: {}",
-                        (100 as f64 * current_counter as f64 / TOTAL_ROUTES as f64),
+                        (100 as f64 * current_counter as f64 / total_routes as f64),
                         step,
                     )
                 }
                 None => println!(
                     "At {current_counter} ({:.6}%) there is no winner",
-                    (100 as f64 * current_counter as f64 / TOTAL_ROUTES as f64),
+                    (100 as f64 * current_counter as f64 / total_routes as f64),
                 ),
             }
         }
         for (index, step) in path.r.iter().enumerate() {
-            let outcome = tick_tensor(&mut next_board, *step);
+            let outcome = tick_tensor(&mut next_board, *step, &mut my_score);
+            if my_score > MAX_SCORE {
+                println!("Abandoning this route as too expensive, current score: {my_score}");
+            }
             match outcome {
                 TickOutcomeTensor::Continue => (),
                 TickOutcomeTensor::Victory => {
@@ -333,6 +338,7 @@ pub(super) fn auto_play_tensor(mut board: BoardTensor) {
     let mut cw = current_winner.lock().unwrap();
     match &*cw {
         Some(Winner { step, route }) => {
+            let mut my_score = 0;
             println!(
                 "Keep pressing any key to reveal the path consisting of {} steps",
                 step + 2
@@ -344,7 +350,7 @@ pub(super) fn auto_play_tensor(mut board: BoardTensor) {
             get_key();
             for action in route.r.iter().take(*step + 1) {
                 index += 1;
-                let _ = tick_tensor(&mut board, *action);
+                let _ = tick_tensor(&mut board, *action, &mut my_score);
                 println!("Step {}/{}...", index + 1, step + 2);
                 println!("{board}");
                 get_key();
@@ -451,13 +457,14 @@ fn recurse_tensor(
         g.add_edge(source_node_index, current_node_index, weight);
     }
 
+    let mut my_score = 0;
     let offsets = [KeyCode::Left, KeyCode::Right, KeyCode::Up, KeyCode::Down];
     for offset in offsets {
         //println!("BEFORE {score} at {depth}:\n{board}");
         //println!("OFFSET:  {offset:?}");
         let mut next_board = board.clone();
         next_board.transitioned_via = Some(offset);
-        let outcome = tick_tensor(&mut next_board, offset);
+        let outcome = tick_tensor(&mut next_board, offset, &mut my_score);
         //println!("AFTER:\n{next_board}\n\n\n");
         if score == 0 && depth == 0 && offset == KeyCode::Right {
             //println!("trap!");
