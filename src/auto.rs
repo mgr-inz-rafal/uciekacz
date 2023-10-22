@@ -4,10 +4,11 @@ use std::{
     hash::{Hash, Hasher},
     io::{self, Write},
     sync::{
-        atomic::{AtomicU64, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
         Arc,
     },
-    time::Instant,
+    thread::sleep,
+    time::{Duration, Instant},
 };
 
 use crossterm::{
@@ -271,9 +272,23 @@ pub(super) fn auto_play_tensor(mut board: BoardTensor) {
     let current_winner: Arc<Mutex<Option<Winner>>> = Arc::new(Mutex::new(None));
     let counter = AtomicU64::new(0);
 
+    let should_stop = Arc::new(AtomicBool::new(false));
+
+    let cloned_should_stop = Arc::clone(&should_stop);
     let last_32_paths = Mutex::new(VecDeque::with_capacity(32));
 
+    let _ = ctrlc::set_handler(move || {
+        println!("Stopping gracefully...");
+        cloned_should_stop.store(true, Ordering::Relaxed);
+        sleep(Duration::from_secs(5));
+        std::process::exit(0);
+    });
+
     route.into_iter().par_bridge().for_each(|path| {
+        if should_stop.load(Ordering::Relaxed) {
+            return;
+        }
+
         {
             let mut last_paths = last_32_paths.lock().unwrap();
             (*last_paths).push_back(path.clone());
@@ -290,21 +305,36 @@ pub(super) fn auto_play_tensor(mut board: BoardTensor) {
         counter.fetch_add(1, Ordering::Relaxed);
         let current_counter = counter.load(Ordering::Relaxed);
         if current_counter % 100 == 0 {
+            let mut cw_step = 0;
+            let mut cw_score = 0;
+            let mut cw_route = String::new();
+            {
+                let cw = current_winner.lock().unwrap();
+                if let Some(Winner { step, score, route }) = &*cw {
+                    cw_step = step.clone();
+                    cw_score = score.clone();
+                    cw_route = route.to_string();
+                }
+            }
             {
                 let last_paths = last_32_paths.lock().unwrap();
                 let mut file = File::create("last_32_paths.txt").unwrap();
+                writeln!(file, "{}", counter.load(Ordering::Relaxed)).unwrap();
+                writeln!(file, "{}", cw_step).unwrap();
+                writeln!(file, "{}", cw_score).unwrap();
+                writeln!(file, "\"{}\"", cw_route).unwrap();
                 for path in &*last_paths {
                     writeln!(file, "{}", path.to_string()).unwrap();
                 }
             }
             let cw = current_winner.lock().unwrap();
             match &*cw {
-                Some(Winner { step, .. }) => {
+                Some(Winner { step, score, .. }) => {
                     println!(
                         "At {current_counter} ({:.6}%) the winner is: {} (with score {})",
                         (100 as f64 * current_counter as f64 / total_routes as f64),
                         step,
-                        my_score,
+                        score,
                     )
                 }
                 None => println!(
@@ -363,7 +393,7 @@ pub(super) fn auto_play_tensor(mut board: BoardTensor) {
 
     println!("Solution found in {:?}", start_instant.elapsed());
 
-    let mut cw = current_winner.lock().unwrap();
+    let cw = current_winner.lock().unwrap();
     match &*cw {
         Some(Winner { step, score, route }) => {
             let mut my_score = 0;
