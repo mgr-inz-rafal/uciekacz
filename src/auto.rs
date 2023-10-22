@@ -1,7 +1,8 @@
 use std::{
-    collections::{hash_map::DefaultHasher, BTreeSet, HashMap, HashSet},
+    collections::{hash_map::DefaultHasher, BTreeSet, HashMap, HashSet, VecDeque},
+    fs::File,
     hash::{Hash, Hasher},
-    io,
+    io::{self, Write},
     sync::{
         atomic::{AtomicU64, Ordering},
         Arc,
@@ -252,7 +253,7 @@ struct Winner {
 
 pub(super) fn auto_play_tensor(mut board: BoardTensor) {
     println!("Looking for solution... ");
-    const LEN: usize = 6;
+    const LEN: usize = 12;
     const MAX_SCORE: u16 = 100;
 
     //println!("{board}");
@@ -270,7 +271,17 @@ pub(super) fn auto_play_tensor(mut board: BoardTensor) {
     let current_winner: Arc<Mutex<Option<Winner>>> = Arc::new(Mutex::new(None));
     let counter = AtomicU64::new(0);
 
+    let last_32_paths = Mutex::new(VecDeque::with_capacity(32));
+
     route.into_iter().par_bridge().for_each(|path| {
+        {
+            let mut last_paths = last_32_paths.lock().unwrap();
+            (*last_paths).push_back(path.clone());
+            if (*last_paths).len() > 32 {
+                (*last_paths).pop_front();
+            }
+        }
+
         let mut got_boards: HashSet<_> = HashSet::new();
         got_boards.insert(board.clone());
         let mut my_score = 0;
@@ -279,6 +290,13 @@ pub(super) fn auto_play_tensor(mut board: BoardTensor) {
         counter.fetch_add(1, Ordering::Relaxed);
         let current_counter = counter.load(Ordering::Relaxed);
         if current_counter % 100 == 0 {
+            {
+                let last_paths = last_32_paths.lock().unwrap();
+                let mut file = File::create("last_32_paths.txt").unwrap();
+                for path in &*last_paths {
+                    writeln!(file, "{}", path.to_string()).unwrap();
+                }
+            }
             let cw = current_winner.lock().unwrap();
             match &*cw {
                 Some(Winner { step, .. }) => {
