@@ -1,5 +1,5 @@
 use std::{
-    collections::{hash_map::DefaultHasher, BTreeSet, HashMap},
+    collections::{hash_map::DefaultHasher, BTreeSet, HashMap, HashSet},
     hash::{Hash, Hasher},
     io,
     sync::{
@@ -251,7 +251,7 @@ struct Winner {
 
 pub(super) fn auto_play_tensor(mut board: BoardTensor) {
     println!("Looking for solution... ");
-    const LEN: usize = 50;
+    const LEN: usize = 18;
     const MAX_SCORE: u16 = 100;
 
     //println!("{board}");
@@ -270,12 +270,14 @@ pub(super) fn auto_play_tensor(mut board: BoardTensor) {
     let counter = AtomicU64::new(0);
 
     route.into_iter().par_bridge().for_each(|path| {
+        let mut got_boards: HashSet<_> = HashSet::new();
+        got_boards.insert(board.clone());
         let mut my_score = 0;
         let mut next_board = board.clone();
         //        println!("Exercising {path}");
         counter.fetch_add(1, Ordering::Relaxed);
         let current_counter = counter.load(Ordering::Relaxed);
-        if current_counter % 10000000 == 0 {
+        if current_counter % 10_000_000 == 0 {
             let cw = current_winner.lock().unwrap();
             match &*cw {
                 Some(Winner { step, .. }) => {
@@ -293,8 +295,12 @@ pub(super) fn auto_play_tensor(mut board: BoardTensor) {
         }
         for (index, step) in path.r.iter().enumerate() {
             let outcome = tick_tensor(&mut next_board, *step, &mut my_score);
+            if got_boards.contains(&next_board) {
+                return;
+            }
             if my_score > MAX_SCORE {
                 println!("Abandoning this route as too expensive, current score: {my_score}");
+                return;
             }
             match outcome {
                 TickOutcomeTensor::Continue => (),

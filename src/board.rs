@@ -152,6 +152,8 @@ pub(super) struct BoardTensor {
     pub(super) transitioned_via: Option<KeyCode>,
 }
 
+impl Eq for BoardTensor {}
+
 impl std::hash::Hash for BoardTensor {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.tiles.hash(state);
