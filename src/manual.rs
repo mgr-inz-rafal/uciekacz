@@ -81,6 +81,7 @@ pub(super) fn manual_play_tensor(mut board: BoardTensor) {
         //     }
         // }
         print_board_tensor(&board);
+        println!("score={my_score}");
     };
 
     let _ = execute!(io::stdout(), terminal::Clear(ClearType::All));

@@ -246,12 +246,13 @@ impl IntoIterator for Route {
 #[derive(Debug)]
 struct Winner {
     step: usize,
+    score: u16,
     route: Route,
 }
 
 pub(super) fn auto_play_tensor(mut board: BoardTensor) {
     println!("Looking for solution... ");
-    const LEN: usize = 18;
+    const LEN: usize = 6;
     const MAX_SCORE: u16 = 100;
 
     //println!("{board}");
@@ -277,14 +278,15 @@ pub(super) fn auto_play_tensor(mut board: BoardTensor) {
         //        println!("Exercising {path}");
         counter.fetch_add(1, Ordering::Relaxed);
         let current_counter = counter.load(Ordering::Relaxed);
-        if current_counter % 10_000_000 == 0 {
+        if current_counter % 100 == 0 {
             let cw = current_winner.lock().unwrap();
             match &*cw {
                 Some(Winner { step, .. }) => {
                     println!(
-                        "At {current_counter} ({:.6}%) the winner is: {}",
+                        "At {current_counter} ({:.6}%) the winner is: {} (with score {})",
                         (100 as f64 * current_counter as f64 / total_routes as f64),
                         step,
+                        my_score,
                     )
                 }
                 None => println!(
@@ -317,16 +319,18 @@ pub(super) fn auto_play_tensor(mut board: BoardTensor) {
                             // );
                             *cw = Some(Winner {
                                 step: index,
+                                score: my_score,
                                 route: path.clone(),
                             });
                         }
-                        Some(Winner { step, .. }) => {
-                            if &index < step {
+                        Some(Winner { score, .. }) => {
+                            if my_score < *score {
                                 // println!(
                                 //     "And this winner is better than the previous one at {step}"
                                 // );
                                 *cw = Some(Winner {
                                     step: index,
+                                    score: my_score,
                                     route: path.clone(),
                                 });
                             } else {
@@ -343,11 +347,11 @@ pub(super) fn auto_play_tensor(mut board: BoardTensor) {
 
     let mut cw = current_winner.lock().unwrap();
     match &*cw {
-        Some(Winner { step, route }) => {
+        Some(Winner { step, score, route }) => {
             let mut my_score = 0;
             println!(
-                "Keep pressing any key to reveal the path consisting of {} steps",
-                step + 2
+                "Keep pressing any key to reveal the path consisting of {} steps and {} score",
+                step, score
             );
             get_key();
             let mut index = 0;
@@ -359,6 +363,7 @@ pub(super) fn auto_play_tensor(mut board: BoardTensor) {
                 let _ = tick_tensor(&mut board, *action, &mut my_score);
                 println!("Step {}/{}...", index + 1, step + 2);
                 println!("{board}");
+                println!("{my_score}");
                 get_key();
             }
         }
