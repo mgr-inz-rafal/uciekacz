@@ -2,7 +2,7 @@ use std::{
     collections::{hash_map::DefaultHasher, BTreeSet, HashMap, HashSet, VecDeque},
     fs::File,
     hash::{Hash, Hasher},
-    io::{self, Write},
+    io::{self, BufRead, BufReader, Write},
     sync::{
         atomic::{AtomicBool, AtomicU64, Ordering},
         Arc,
@@ -164,6 +164,21 @@ impl Route {
     pub fn iter(&self) -> RouteIterator {
         RouteIterator::new((*self).clone())
     }
+
+    pub fn from_string(i: String) -> Self {
+        let v: Vec<_> = i
+            .chars()
+            .filter_map(|c| match c {
+                'D' => Some(KeyCode::Down),
+                'U' => Some(KeyCode::Up),
+                'L' => Some(KeyCode::Left),
+                'R' => Some(KeyCode::Right),
+                '"' => None,
+                _ => panic!("{}", c),
+            })
+            .collect();
+        Self { r: v }
+    }
 }
 
 impl std::fmt::Display for Route {
@@ -252,7 +267,7 @@ struct Winner {
     route: Route,
 }
 
-pub(super) fn auto_play_tensor(mut board: BoardTensor) {
+pub(super) fn auto_play_tensor(mut board: BoardTensor, cont: bool) {
     println!("Looking for solution... ");
     const LEN: usize = 12;
     const MAX_SCORE: u16 = 100;
@@ -283,6 +298,26 @@ pub(super) fn auto_play_tensor(mut board: BoardTensor) {
         sleep(Duration::from_secs(5));
         std::process::exit(0);
     });
+
+    if cont {
+        println!("Resuming search...");
+        let file = File::open("last_32_paths.txt").unwrap();
+        let reader = BufReader::new(file);
+        let mut lines = reader.lines();
+
+        let l_counter = lines.next().unwrap().unwrap();
+        let l_cw_step = lines.next().unwrap().unwrap();
+        let l_cw_score = lines.next().unwrap().unwrap();
+        let l_cw_route = lines.next().unwrap().unwrap();
+
+        counter.store(l_counter.parse().unwrap(), Ordering::Relaxed);
+        let mut cw = current_winner.lock().unwrap();
+        *cw = Some(Winner {
+            step: l_cw_step.parse().unwrap(),
+            score: l_cw_score.parse().unwrap(),
+            route: Route::from_string(l_cw_route),
+        });
+    }
 
     route.into_iter().par_bridge().for_each(|path| {
         if should_stop.load(Ordering::Relaxed) {
