@@ -157,7 +157,7 @@ struct Route {
 impl Route {
     fn new(len: usize) -> Self {
         Self {
-            r: std::iter::repeat(KeyCode::Left).take(len).collect(),
+            r: std::iter::repeat(KeyCode::Down).take(len).collect(),
         }
     }
 
@@ -165,7 +165,7 @@ impl Route {
         RouteIterator::new((*self).clone())
     }
 
-    pub fn from_string(i: String) -> Self {
+    pub fn from_string(i: &String) -> Self {
         let v: Vec<_> = i
             .chars()
             .filter_map(|c| match c {
@@ -209,11 +209,11 @@ impl RouteIterator {
     fn inc(&mut self, pos: usize) -> bool {
         let c = self.current.r[pos];
         match c {
+            KeyCode::Down => self.current.r[pos] = KeyCode::Left,
             KeyCode::Left => self.current.r[pos] = KeyCode::Right,
             KeyCode::Right => self.current.r[pos] = KeyCode::Up,
-            KeyCode::Up => self.current.r[pos] = KeyCode::Down,
-            KeyCode::Down => {
-                self.current.r[pos] = KeyCode::Left;
+            KeyCode::Up => {
+                self.current.r[pos] = KeyCode::Down;
                 if pos < self.current.r.len() - 1 {
                     if !self.inc(pos + 1) {
                         return false;
@@ -269,7 +269,7 @@ struct Winner {
 
 pub(super) fn auto_play_tensor(mut board: BoardTensor, cont: bool) {
     println!("Looking for solution... ");
-    const LEN: usize = 12;
+    const LEN: usize = 20;
     const MAX_SCORE: u16 = 100;
 
     //println!("{board}");
@@ -281,8 +281,6 @@ pub(super) fn auto_play_tensor(mut board: BoardTensor, cont: bool) {
         "Total routes to check (millions): {}",
         total_routes / 1_000_000_f64
     );
-
-    let route = Route::new(LEN);
 
     let current_winner: Arc<Mutex<Option<Winner>>> = Arc::new(Mutex::new(None));
     let counter = AtomicU64::new(0);
@@ -299,7 +297,7 @@ pub(super) fn auto_play_tensor(mut board: BoardTensor, cont: bool) {
         std::process::exit(0);
     });
 
-    if cont {
+    let route = if cont {
         println!("Resuming search...");
         let file = File::open("last_32_paths.txt").unwrap();
         let reader = BufReader::new(file);
@@ -315,9 +313,21 @@ pub(super) fn auto_play_tensor(mut board: BoardTensor, cont: bool) {
         *cw = Some(Winner {
             step: l_cw_step.parse().unwrap(),
             score: l_cw_score.parse().unwrap(),
-            route: Route::from_string(l_cw_route),
+            route: Route::from_string(&l_cw_route),
         });
-    }
+
+        let mut search_paths = vec![];
+        for line in lines {
+            if let Ok(line) = line {
+                search_paths.push(line);
+            }
+        }
+        search_paths.sort();
+        Route::from_string(&search_paths.first().unwrap())
+    } else {
+        println!("Starting search from scratch...");
+        Route::new(LEN)
+    };
 
     route.into_iter().par_bridge().for_each(|path| {
         if should_stop.load(Ordering::Relaxed) {
@@ -339,7 +349,7 @@ pub(super) fn auto_play_tensor(mut board: BoardTensor, cont: bool) {
         //        println!("Exercising {path}");
         counter.fetch_add(1, Ordering::Relaxed);
         let current_counter = counter.load(Ordering::Relaxed);
-        if current_counter % 100 == 0 {
+        if current_counter % 1_000_000 == 0 {
             let mut cw_step = 0;
             let mut cw_score = 0;
             let mut cw_route = String::new();
